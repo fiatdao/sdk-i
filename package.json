@@ -11,6 +11,8 @@
     "changelog": "https://github.com/fiatdao/changelog",
     "ethers": "^5.7.1",
     "ethers-multicall": "^0.2.3",
+    "graphql": "^16.6.0",
+    "graphql-request": "^5.0.0",
     "graphql-tag": "^2.12.6"
   },
   "devDependencies": {

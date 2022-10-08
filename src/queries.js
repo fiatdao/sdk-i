@@ -1,6 +1,32 @@
-import gql from 'graphql-tag'
+import { gql } from 'graphql-request'
 
-export const POSITIONS = gql`
+export const queryVault = gql`
+  query Vault($id: ID!) {
+    vault(id: $id) {
+      name
+      collateralTypes {
+        tokenId
+        maturity
+        symbol
+        underlierSymbol
+        eptData {
+          balancerVault
+          convergentCurvePool
+          poolId
+        }
+        fcData {
+          notional
+          tenor
+        }
+        fyData {
+          yieldSpacePool
+        }
+      }
+    }
+  }
+`
+
+export const queryPositions = gql`
   query Positions($where: Position_filter) {
     positions(where: $where) {
       id
@@ -29,8 +55,8 @@ export const POSITIONS = gql`
   }
 `
 
-export const COLLATERALS = gql`
-  query Collaterals(
+export const queryCollateralTypes = gql`
+  query CollateralTypes(
     $where: CollateralType_filter
     $orderBy: CollateralType_orderBy
     $orderDirection: OrderDirection
@@ -78,7 +104,7 @@ export const COLLATERALS = gql`
 `
 
 
-export const AUCTION_MAIN_DATA = gql`
+export const queryAuction = gql`
   fragment Auction on CollateralAuction {
     id
     auctionId
@@ -115,8 +141,7 @@ export const AUCTION_MAIN_DATA = gql`
   }
 `
 
-export const AUCTION_BY_ID = gql`
-  ${AUCTION_MAIN_DATA}
+export const queryAuctionById = gql`
   query auctionById($id: ID!) {
     collateralAuction(id: $id) {
       ...Auction
@@ -124,8 +149,7 @@ export const AUCTION_BY_ID = gql`
   }
 `
 
-export const AUCTIONS = gql`
-  ${AUCTION_MAIN_DATA}
+export const queryAuctions = gql`
   query auctions($where: CollateralAuction_filter) {
     collateralAuctions(where: $where) {
       ...Auction
@@ -133,7 +157,7 @@ export const AUCTIONS = gql`
   }
 `
 
-export const TRANSACTIONS = gql`
+export const queryTransactions = gql`
   query Transactions($where: PositionTransactionAction_filter) {
     positionTransactionActions(where: $where) {
       __typename
@@ -166,7 +190,7 @@ export const TRANSACTIONS = gql`
   }
 `
 
-export const USER_PROXY = gql`
+export const queryUserProxy = gql`
   query userProxy($id: ID!) {
     userProxy(id: $id) {
       id

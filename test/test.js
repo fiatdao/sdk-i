@@ -1,4 +1,5 @@
 const { FIAT } = require('../lib/index');
+const { queryPositions, queryUserProxy } = require('../lib/queries');
 
 const MAINNET = require('changelog/deployment/deployment-mainnet.json');
 
@@ -22,9 +23,8 @@ const MAINNET = require('changelog/deployment/deployment-mainnet.json');
     { contract: contracts.codex, method: 'vaults', args: [MAINNET.vaultEPT_ePyvDAI_24FEB23.address] }
   ]));
 
-
-  const vaultData = await fiat.fetchVaultData(MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
-  console.log(vaultData);
+  const vaultData = await fiat.fetchVaultData(MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase());
+  console.log(JSON.stringify(vaultData));
   
   const positionData = await fiat.fetchPositionData(
     MAINNET.vaultEPT_ePyvDAI_24FEB23.address, 0, '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c'
@@ -32,7 +32,18 @@ const MAINNET = require('changelog/deployment/deployment-mainnet.json');
   console.log(positionData);
 
   console.log(fiat.computeHealthFactor(
-    positionData.collateral, positionData.normalDebt, vaultData.rate, vaultData.liquidationPrice)
+    positionData.collateral, positionData.normalDebt, vaultData.state.codex.rate, vaultData.state.liquidationPrice)
   );
+
+  console.log(await fiat.query(queryPositions, { where: { owner: '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c' } }));
+
+  console.log(await fiat.call(
+    contracts.vaultEPTActions,
+    'underlierToPToken',
+    MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+    vaultData.properties.tokenIds[0].balancerVault,
+    vaultData.properties.tokenIds[0].poolId,
+    fiat.toWad('100')
+  ));
 })();
 
