@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { Contract, Provider } from 'ethers-multicall';
+import { Contract as EthCallContract, Provider as EthCallProvider } from 'ethers-multicall';
 
 import MAINNET from 'changelog/deployment/deployment-mainnet.json';
 import GOERLI from 'changelog/deployment/deployment-goerli.json';
@@ -33,7 +33,7 @@ export class FIAT {
     this.addresses = (chainId === 1) ? MAINNET : (chainId === 5) ? GOERLI : null;
     if (this.addresses === null) throw new Error('Unsupported Network');
 
-    this.ethcallProvider = new Provider(provider, chainId);
+    this.ethcallProvider = new EthCallProvider(provider, chainId);
   }
 
   static async fromSigner(signer, subgraphUrl) {
@@ -104,7 +104,7 @@ export class FIAT {
 
   async multicall(calls) {
     const multicall = calls.map(({ contract, method, args }) => {
-      return (new Contract(contract.address, contract.abi))[method](...args);
+      return (new EthCallContract(contract.address, contract.abi))[method](...args);
     });
     return await this.ethcallProvider.all(multicall);
   }
@@ -145,7 +145,7 @@ export class FIAT {
   async fetchVaultData(address) {
     const { codex, collybus, limes, noLossCollateralAuction, publican } = this.getContracts();
     const vaultContract = this.getVaultContract(address);
-    return await this.multicall([
+    const vaultData = await this.multicall([
       { contract: codex, method: 'vaults', args: [address] },
       { contract: collybus, method: 'vaults', args: [address] },
       { contract: limes, method: 'vaults', args: [address] },
@@ -158,17 +158,46 @@ export class FIAT {
       { contract: vaultContract, method: 'underlierScale', args: [] },
       { contract: vaultContract, method: 'fairPrice', args: [0, true, false] }
     ]);
+    return {
+      totalNormalDebt: vaultData[0].totalNormalDebt,
+      rate: vaultData[0].rate,
+      debtCeiling: vaultData[0].debtCeiling,
+      debtFloor: vaultData[0].debtFloor,
+      liquidationRatio: vaultData[1].liquidationRatio,
+      defaultRateId: vaultData[1].defaultRateId,
+      collateralAuction: vaultData[2].collateralAuction,
+      liquidationPenalty: vaultData[2].liquidationPenalty,
+      maxDebtOnAuction: vaultData[2].maxDebtOnAuction,
+      debtOnAuction: vaultData[2].debtOnAuction,
+      multiplier: vaultData[3].multiplier,
+      maxAuctionDuration: vaultData[3].maxAuctionDuration,
+      auctionDebtFloor: vaultData[3].auctionDebtFloor,
+      collybus: vaultData[3].collybus,
+      calculator: vaultData[3].calculator,
+      interestPerSecond: vaultData[4].interestPerSecond,
+      lastCollected: vaultData[4].lastCollected,
+      maturity: vaultData[5],
+      token: vaultData[6],
+      tokenScale: vaultData[7],
+      underlierToken: vaultData[8],
+      underlierScale: vaultData[9],
+      fairPrice: vaultData[10]
+    }
   }
 
   async fetchPositionData(vault, tokenId, owner) {
     const { codex } = this.getContracts();
-    return await this.call(codex, 'positions', vault, tokenId, owner);
+    const positionData = await this.call(codex, 'positions', vault, tokenId, owner);
+    return {
+      collateral: positionData.collateral,
+      normalDebt: positionData.normalDebt,
+    };
   }
 
-  async healthFactor(collateral, normalDebt, rate, fairPrice, liquidationRatio) {
+  healthFactor(collateral, normalDebt, rate, fairPrice) {
     const debt = normalDebt.mul(rate).div(WAD);
-    if (debt.isZero()) return ethers.BigNumber(100);
-    if (!collateral.isZero()) collateral.mul(fairPrice).div(debt).div(liquidationRatio);
-    return ethers.BigNumber(0);
+    if (debt.isZero()) return ethers.BigNumber.from(100);
+    if (!collateral.isZero()) return collateral.mul(fairPrice).div(debt);
+    return ethers.BigNumber.from(0);
   }
 }
