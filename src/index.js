@@ -140,8 +140,6 @@ export class FIAT {
     );
   }
 
-  async fetchAll() {}
-
   async fetchVaultData(address) {
     const { codex, collybus, limes, noLossCollateralAuction, publican } = this.getContracts();
     const vaultContract = this.getVaultContract(address);
@@ -194,7 +192,7 @@ export class FIAT {
     };
   }
 
-  healthFactor(collateral, normalDebt, rate, fairPrice) {
+  computeHealthFactor(collateral, normalDebt, rate, fairPrice) {
     const debt = normalDebt.mul(rate).div(WAD);
     if (debt.isZero()) return ethers.BigNumber.from(100);
     if (!collateral.isZero()) return collateral.mul(fairPrice).div(debt);
