@@ -1,0 +1,21 @@
+{
+  "name": "fiat-sdk",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "rm -rf ./lib && babel ./src -d ./lib",
+    "test": "yarn build && source ./.env && node ./test/test.js"
+  },
+  "dependencies": {
+    "changelog": "https://github.com/fiatdao/changelog",
+    "ethers": "^5.7.1",
+    "ethers-multicall": "^0.2.3",
+    "graphql-tag": "^2.12.6"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.19.3",
+    "@babel/core": "^7.19.3",
+    "@babel/preset-env": "^7.19.3"
+  }
+}
