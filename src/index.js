@@ -122,7 +122,7 @@ export class FIAT {
   }
 
   async send(contract, method, ...args) {
-    const { _contract, txRequest, txOpts } = this.buildTx(contract, ...args);
+    const { _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
     return await _contract[method](
       ...txRequest, { ...txOpts, gasLimit: gas.mul(GAS_MULTIPLIER * 100).div(100), ...feeData }
     );
