@@ -154,6 +154,7 @@ export class FIAT {
       { contract: vaultContract, method: 'tokenScale', args: [] },
       { contract: vaultContract, method: 'underlierToken', args: [] },
       { contract: vaultContract, method: 'underlierScale', args: [] },
+      { contract: vaultContract, method: 'fairPrice', args: [0, false, false] },
       { contract: vaultContract, method: 'fairPrice', args: [0, true, false] }
     ]);
     return {
@@ -179,7 +180,8 @@ export class FIAT {
       tokenScale: vaultData[7],
       underlierToken: vaultData[8],
       underlierScale: vaultData[9],
-      fairPrice: vaultData[10]
+      fairPrice: vaultData[10],
+      liquidationPrice: vaultData[11]
     }
   }
 
@@ -192,10 +194,10 @@ export class FIAT {
     };
   }
 
-  computeHealthFactor(collateral, normalDebt, rate, fairPrice) {
+  computeHealthFactor(collateral, normalDebt, rate, liquidationPrice) {
     const debt = normalDebt.mul(rate).div(WAD);
     if (debt.isZero()) return ethers.BigNumber.from(100);
-    if (!collateral.isZero()) return collateral.mul(fairPrice).div(debt);
+    if (!collateral.isZero()) return collateral.mul(liquidationPrice).div(debt);
     return ethers.BigNumber.from(0);
   }
 }

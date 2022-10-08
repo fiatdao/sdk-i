@@ -32,7 +32,7 @@ const MAINNET = require('changelog/deployment/deployment-mainnet.json');
   console.log(positionData);
 
   console.log(fiat.computeHealthFactor(
-    positionData.collateral, positionData.normalDebt, vaultData.rate, vaultData.fairPrice)
+    positionData.collateral, positionData.normalDebt, vaultData.rate, vaultData.liquidationPrice)
   );
 })();
 
