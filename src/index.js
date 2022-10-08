@@ -244,6 +244,4 @@ export class FIAT {
     if (!collateral.isZero()) return collateral.mul(liquidationPrice).div(debt);
     return ethers.BigNumber.from(0);
   }
-
-
 }
