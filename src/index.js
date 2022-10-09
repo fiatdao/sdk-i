@@ -39,7 +39,6 @@ export class FIAT {
     this.subgraphUrl = subgraphUrl;
     this.addresses = (chainId === 1) ? MAINNET : (chainId === 5) ? GOERLI : null;
     if (this.addresses === null) throw new Error('Unsupported Network');
-
   }
 
   static async fromSigner(signer, subgraphUrl) {
