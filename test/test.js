@@ -29,7 +29,7 @@ const MAINNET = require('changelog/deployment/deployment-mainnet.json');
   const positionData = await fiat.fetchPositionData(
     MAINNET.vaultEPT_ePyvDAI_24FEB23.address, 0, '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c'
   );
-  console.log(positionData);
+  console.log(positionData.collateral.toString(), positionData.normalDebt.toString());
 
   const healthFactor = fiat.computeHealthFactor(
     positionData.collateral, positionData.normalDebt, vaultData.state.codex.rate, vaultData.state.liquidationPrice
@@ -43,6 +43,11 @@ const MAINNET = require('changelog/deployment/deployment-mainnet.json');
   console.log(fiat.computeMinCollateral(
     healthFactor, positionData.normalDebt, vaultData.state.codex.rate, vaultData.state.liquidationPrice)
   );
+
+  const debt = fiat.normalDebtToDebt(positionData.normalDebt, vaultData.state.codex.rate);
+  console.log(debt.toString());
+
+  console.log(fiat.debtToNormalDebt(debt, vaultData.state.codex.rate).toString());
 
   console.log(await fiat.query(queryPositions, { where: { owner: '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c' } }));
 

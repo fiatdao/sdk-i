@@ -24,7 +24,7 @@ import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.jso
 
 import { queryVault } from './queries';
 
-const { parseUnits: toUnit,  formatBytes32String: toBytes32 } = ethers.utils;
+// mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 
 const GAS_MULTIPLIER = 1.3;
@@ -52,16 +52,25 @@ export class FIAT {
     return new FIAT(signer, provider, subgraphUrl, (await signer.provider.getNetwork()).chainId);
   }
 
-  toWad(decimal) {
-    return toUnit(decimal, '18');
+  decimalToWad(decimal) {
+    return ethers.utils.parseEther(decimal);
   }
 
-  fromWad(wad) {
-    return fromUnit(wad, '18');
+  wadToDecimal(wad) {
+    return ethers.utils.formatEther(wad);
+  }
+
+  scaleToWad(amount, fromScale) {
+    if (fromScale.isZero()) return ethers.BigNumber.from(0);
+    return amount.mul(WAD).div(fromScale);
+  }
+
+  scaleFromWad(amount, toScale) {
+    return amount.mul(toScale).div(WAD);
   }
 
   toBytes32(str) {
-    return toBytes32(str);
+    return ethers.utils.formatBytes32String(str);
   }
 
   #getContract(artifact, address) {
@@ -238,22 +247,38 @@ export class FIAT {
     };
   }
 
+  // collateral in WAD 
   computeHealthFactor(collateral, normalDebt, rate, liquidationPrice) {
-    const debt = normalDebt.mul(rate).div(WAD);
+    const debt = this.normalDebtToDebt(normalDebt, rate);
     if (debt.isZero()) return ethers.BigNumber.from(ethers.constants.MaxUint256);
     if (collateral.isZero()) return ethers.BigNumber.from(0);
     return collateral.mul(liquidationPrice).div(debt);
   }
 
+  // collateral in WAD 
   computeMaxNormalDebt(collateral, healthFactor, rate, liquidationPrice) {
     if (healthFactor.isZero() || rate.isZero()) return ethers.BigNumber.from(0);
-    return collateral.mul(liquidationPrice).div(healthFactor).mul(WAD).div(rate);
+    return this.debtToNormalDebt(collateral.mul(liquidationPrice).div(healthFactor), rate);
   }
 
   computeMinCollateral(healthFactor, normalDebt, rate, liquidationPrice) {
-    const debt = normalDebt.mul(rate).div(WAD);
+    const debt = this.normalDebtToDebt(normalDebt, rate);
     if (debt.isZero()) return ethers.BigNumber.from(ethers.constants.MaxUint256);
     if (liquidationPrice.isZero()) return ethers.BigNumber.from(0);
     return healthFactor.mul(debt).div(liquidationPrice);
+  }
+
+  normalDebtToDebt(normalDebt, rate) {
+    return normalDebt.mul(rate).div(WAD);
+  }
+
+  debtToNormalDebt(debt, rate) {
+    if (rate.isZero()) return ethers.BigNumber.from(0);
+    let normalDebt = debt.mul(WAD).div(rate);
+    // avoid potential rounding error when converting back to debt from normalDebt
+    if (normalDebt.mul(rate).div(WAD).lt(debt)) {
+      normalDebt = normalDebt.add(1);
+    }
+    return normalDebt;
   }
 }
