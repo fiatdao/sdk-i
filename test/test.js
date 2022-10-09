@@ -1,9 +1,9 @@
 const { FIAT } = require('../lib/index');
-const { queryPositions, queryUserProxy } = require('../lib/queries');
+const { queryPositions } = require('../lib/queries');
 
 const MAINNET = require('changelog/deployment/deployment-mainnet.json');
 
-// Tests run mainnet state at block height 15711690
+// Tests run on mainnet state at block height 15711690
 describe('FIAT', () => {
 
   let fiat;
