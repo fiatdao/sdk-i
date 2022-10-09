@@ -52,11 +52,11 @@ export class FIAT {
     return new FIAT(signer, provider, subgraphUrl, (await signer.provider.getNetwork()).chainId);
   }
 
-  decimalToWad(decimal) {
+  decToWad(decimal) {
     return ethers.utils.parseEther(decimal);
   }
 
-  wadToDecimal(wad) {
+  wadToDec(wad) {
     return ethers.utils.formatEther(wad);
   }
 
@@ -65,7 +65,7 @@ export class FIAT {
     return amount.mul(WAD).div(fromScale);
   }
 
-  scaleFromWad(amount, toScale) {
+  wadToScale(amount, toScale) {
     return amount.mul(toScale).div(WAD);
   }
 

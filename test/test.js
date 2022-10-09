@@ -57,7 +57,7 @@ const MAINNET = require('changelog/deployment/deployment-mainnet.json');
     MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
     vaultData.properties.tokenIds[0].balancerVault,
     vaultData.properties.tokenIds[0].poolId,
-    fiat.toWad('100')
+    fiat.decToWad('100')
   ));
 })();
 
