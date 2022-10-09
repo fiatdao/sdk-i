@@ -31,8 +31,17 @@ const MAINNET = require('changelog/deployment/deployment-mainnet.json');
   );
   console.log(positionData);
 
-  console.log(fiat.computeHealthFactor(
-    positionData.collateral, positionData.normalDebt, vaultData.state.codex.rate, vaultData.state.liquidationPrice)
+  const healthFactor = fiat.computeHealthFactor(
+    positionData.collateral, positionData.normalDebt, vaultData.state.codex.rate, vaultData.state.liquidationPrice
+  );
+  console.log(healthFactor.toString());
+
+  console.log(fiat.computeMaxNormalDebt(
+    positionData.collateral, healthFactor, vaultData.state.codex.rate, vaultData.state.liquidationPrice)
+  );
+
+  console.log(fiat.computeMinCollateral(
+    healthFactor, positionData.normalDebt, vaultData.state.codex.rate, vaultData.state.liquidationPrice)
   );
 
   console.log(await fiat.query(queryPositions, { where: { owner: '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c' } }));

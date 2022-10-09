@@ -240,8 +240,20 @@ export class FIAT {
 
   computeHealthFactor(collateral, normalDebt, rate, liquidationPrice) {
     const debt = normalDebt.mul(rate).div(WAD);
-    if (debt.isZero()) return ethers.BigNumber.from(100);
-    if (!collateral.isZero()) return collateral.mul(liquidationPrice).div(debt);
-    return ethers.BigNumber.from(0);
+    if (debt.isZero()) return ethers.BigNumber.from(ethers.constants.MaxUint256);
+    if (collateral.isZero()) return ethers.BigNumber.from(0);
+    return collateral.mul(liquidationPrice).div(debt);
+  }
+
+  computeMaxNormalDebt(collateral, healthFactor, rate, liquidationPrice) {
+    if (healthFactor.isZero() || rate.isZero()) return ethers.BigNumber.from(0);
+    return collateral.mul(liquidationPrice).div(healthFactor).mul(WAD).div(rate);
+  }
+
+  computeMinCollateral(healthFactor, normalDebt, rate, liquidationPrice) {
+    const debt = normalDebt.mul(rate).div(WAD);
+    if (debt.isZero()) return ethers.BigNumber.from(ethers.constants.MaxUint256);
+    if (liquidationPrice.isZero()) return ethers.BigNumber.from(0);
+    return healthFactor.mul(debt).div(liquidationPrice);
   }
 }
