@@ -5,6 +5,7 @@
   "license": "MIT",
   "scripts": {
     "build": "rm -rf ./lib && babel ./src -d ./lib",
+    "ci": "yarn build && jest",
     "test": "yarn build && source ./.env && jest"
   },
   "dependencies": {
