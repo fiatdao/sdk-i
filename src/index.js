@@ -27,12 +27,12 @@ import { queryVault } from './queries';
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 
-const GAS_MULTIPLIER = 1.3;
 const WAD = ethers.utils.parseUnits('1', '18');
 
 export class FIAT {
 
   constructor(signer, provider, subgraphUrl, chainId) {
+    this.gasMultiplier = 1.3;
     this.signer = signer;
     this.provider = provider;
     this.ethcallProvider = new EthCallProvider(provider, chainId);
@@ -49,6 +49,10 @@ export class FIAT {
     const provider = new ethers.providers.JsonRpcProvider(web3ProviderUrl);
     const signer = new ethers.Wallet(privateKey, provider);
     return new FIAT(signer, provider, subgraphUrl, (await signer.provider.getNetwork()).chainId);
+  }
+
+  setGasMultiplier(multiplier) {
+    this.gasMultiplier = multiplier;
   }
 
   decToWad(decimal) {
@@ -141,7 +145,7 @@ export class FIAT {
   async send(contract, method, ...args) {
     const { _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
     return await _contract[method](
-      ...txRequest, { ...txOpts, gasLimit: gas.mul(GAS_MULTIPLIER * 100).div(100), ...feeData }
+      ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100), ...feeData }
     );
   }
 
@@ -153,7 +157,7 @@ export class FIAT {
     const { _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
     const gas = await _contract.estimateGas[method](...txRequest, txOpts);
     return await _contract.populateTransaction[method](
-      ...txRequest, { ...txOpts, gasLimit: gas.mul(GAS_MULTIPLIER * 100).div(100), ...feeData }
+      ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100), ...feeData }
     );
   }
 
