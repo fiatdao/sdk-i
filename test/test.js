@@ -46,7 +46,7 @@ describe('FIAT', () => {
     const error = await fiat.dryrun(vault, 'enter', 0, fiat.signer.address, '1000');
     expect(error.success).toBe(false);
     expect(error.reason.includes('ERC20: insufficient-balance')).toBe(true);
-    expect(error.decodedError).toBe(undefined); // .toBe('Error(string)'); // `data` field is not returned by tenderly
+    expect(error.customError).toBe(undefined); // .toBe('Error(string)'); // `data` field is not returned by tenderly
   });
 
   test('fetchVaultData', async () => {

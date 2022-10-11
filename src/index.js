@@ -160,14 +160,14 @@ export class FIAT {
       return { success: true, gas }
     } catch (error) {
       const reason = error.reason;
-      let decodedError = undefined;
+      let customError = undefined;
       try {
         // assumes error returned by json rpc provider contains `data` field (tested with Alchemy)
-        decodedError = (await ethers.utils.fetchJson(
+        customError = (await ethers.utils.fetchJson(
           `https://www.4byte.directory/api/v1/signatures/?hex_signature=${error.error.error.data.slice(0, 10)}`
         )).results[0].text_signature;
       } catch (error) {}
-      return { success: false, reason, decodedError }
+      return { success: false, reason, customError }
     }
   }
 
