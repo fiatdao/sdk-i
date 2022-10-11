@@ -15,6 +15,10 @@
     "README.md",
     "yarn.lock"
   ],
+  "babel": {
+    "presets": [["@babel/preset-env", { "targets": { "browsers": ["chrome >= 66", "firefox >= 68"] } }]],
+    "sourceMaps": "inline"
+  },
   "dependencies": {
     "changelog": "https://github.com/fiatdao/changelog",
     "ethers": "^5.7.1",

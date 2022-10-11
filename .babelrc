@@ -1,4 +1,0 @@
-{
-  "presets": [["@babel/preset-env", { "targets": { "browsers": ["chrome >= 66", "firefox >= 68"] } }]],
-  "sourceMaps": "inline"
-}
