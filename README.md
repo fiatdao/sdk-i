@@ -40,7 +40,7 @@ After installing dependencies with `yarn`, run `yarn test` to run the tests.
 ## Building and testing
 
 ```sh
-git clone https://github.com/fiatdao/fiat-sdk
+git clone https://github.com/fiatdao/sdk
 cd fiat
 yarn # This installs the project's dependencies.
 yarn test
