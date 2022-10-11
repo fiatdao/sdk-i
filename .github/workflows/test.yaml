@@ -20,5 +20,5 @@ jobs:
 
       - name: Run tests
         env:
-          TENDERLY_FORK_URL_15711690: "${{ secrets.TENDERLY_FORK_URL_15711690 }}"
+          ALCHEMY_API_KEY: "${{ secrets.ALCHEMY_API_KEY }}"
         run: yarn ci
