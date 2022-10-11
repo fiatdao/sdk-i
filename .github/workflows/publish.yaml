@@ -1,0 +1,29 @@
+name: Publish
+
+on:
+  branch:
+    mainnet:
+      - push
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+
+      - uses: actions/checkout@v3
+
+      - name: Install depedencies
+        run: yarn
+
+       - name: Run tests
+        env:
+          ALCHEMY_API_KEY: "${{ secrets.ALCHEMY_API_KEY }}"
+        run: yarn ci
+
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_TOKEN }}

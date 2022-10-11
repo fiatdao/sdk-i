@@ -4,7 +4,7 @@ const ganache = require('ganache');
 const { FIAT } = require('../lib/index');
 const { queryPositions } = require('../lib/queries');
 
-const MAINNET = require('changelog/deployment/deployment-mainnet.json');
+const ADDRESSES_MAINNET = require('changelog/deployment/deployment-mainnet.json');
 
 jest.setTimeout(10000);
 
@@ -41,15 +41,14 @@ describe('FIAT', () => {
   });
 
   test('fromSigner', async () => {
-    fiat = await FIAT.fromProvider(provider, 'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph');
+    fiat = await FIAT.fromProvider(provider);
     expect(fiat != undefined).toBe(true);
   });
 
   test('fromPrivateKey', async () => {
     const fiat_ = await FIAT.fromPrivateKey(
       `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
-      '000000000000000000000000000000000000000000000000000000000000000A',
-      'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph'
+      '000000000000000000000000000000000000000000000000000000000000000A'
     );
     expect(fiat_ != undefined).toBe(true);
   });
@@ -68,7 +67,7 @@ describe('FIAT', () => {
       { contract: contracts.codex, method: 'globalDebt', args: [] },
       { contract: contracts.codex, method: 'globalUnbackedDebt', args: [] },
       { contract: contracts.codex, method: 'globalDebtCeiling', args: [] },
-      { contract: contracts.codex, method: 'vaults', args: [MAINNET.vaultEPT_ePyvDAI_24FEB23.address] }
+      { contract: contracts.codex, method: 'vaults', args: [ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address] }
     ]);
     expect(results.length).toBe(4);
     expect(results[0].gt(0)).toBe(true);
@@ -79,12 +78,12 @@ describe('FIAT', () => {
     await fiat.encode(
       contracts.publican,
       'collect',
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address
     );
     await fiat.encode(
       contracts.publican,
       'collect',
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
       { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001'}
     );
   });
@@ -93,12 +92,12 @@ describe('FIAT', () => {
     await fiat.send(
       contracts.publican,
       'collect',
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address
     );
     await fiat.send(
       contracts.publican,
       'collect',
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
       { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001'}
     );
   });
@@ -109,7 +108,7 @@ describe('FIAT', () => {
       proxy,
       contracts.publican,
       'collect',
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
       { from: proxyOwner }
     );
   });
@@ -118,7 +117,7 @@ describe('FIAT', () => {
     await fiat.sendAndWait(
       contracts.publican,
       'collect',
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address
     );
   });
 
@@ -128,13 +127,13 @@ describe('FIAT', () => {
       proxy,
       contracts.publican,
       'collect',
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
       { from: proxyOwner }
     );
   });
 
   test('dryrun', async () => {
-    const vault = fiat.getVaultContract(MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
+    const vault = fiat.getVaultContract(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
 
     const resultSuccess = await fiat.dryrun(contracts.publican, 'collect', vault.address);
     expect(resultSuccess.success).toBe(true);
@@ -146,7 +145,7 @@ describe('FIAT', () => {
   });
 
   test('dryrunViaProxy', async () => {
-    const vault = fiat.getVaultContract(MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
+    const vault = fiat.getVaultContract(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
 
     // Ganache returns stale data 
     // const resultSuccess = await fiat.dryrunViaProxy(
@@ -163,14 +162,14 @@ describe('FIAT', () => {
   });
 
   test('fetchVaultData', async () => {
-    vaultData = await fiat.fetchVaultData(MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase());
+    vaultData = await fiat.fetchVaultData(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase());
     expect(vaultData.properties.name).toBe('VaultEPT_ePyvDAI_24FEB23');
     expect(vaultData.settings.codex.debtCeiling.gt(0)).toBe(true);
   });
 
   test('fetchPositionData', async () => {
     positionData = await fiat.fetchPositionData(
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address, 0, '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c'
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address, 0, '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c'
     );
     expect(positionData.collateral.gt(0)).toBe(true);
     expect(positionData.normalDebt.gt(0)).toBe(true);
@@ -217,7 +216,7 @@ describe('FIAT', () => {
     const pToken = await fiat.call(
       contracts.vaultEPTActions,
       'underlierToPToken',
-      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
       vaultData.properties.tokenIds[0].balancerVault,
       vaultData.properties.tokenIds[0].poolId,
       fiat.decToWad('100')

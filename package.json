@@ -1,13 +1,20 @@
 {
-  "name": "fiat-sdk",
-  "version": "1.0.0",
-  "main": "src/index.js",
+  "name": "@fiatdao/sdk",
+  "version": "0.0.1",
+  "main": "src/lib/index.js",
   "license": "MIT",
   "scripts": {
     "build": "rm -rf ./lib && babel ./src -d ./lib",
     "ci": "yarn build && jest",
     "test": "yarn build && source ./.env && jest"
   },
+  "files": [
+    "lib/",
+    "src/",
+    ".babelrc",
+    "README.md",
+    "yarn.lock"
+  ],
   "dependencies": {
     "changelog": "https://github.com/fiatdao/changelog",
     "ethers": "^5.7.1",

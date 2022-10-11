@@ -1,5 +1,8 @@
 import { gql } from 'graphql-request'
 
+export const SUBGRAPH_URL_MAINNET = 'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph';
+export const SUBGRAPH_URL_GOERLI = 'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph-goerli';
+
 export const queryVault = gql`
   query Vault($id: ID!) {
     vault(id: $id) {

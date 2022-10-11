@@ -2,8 +2,8 @@ import { ethers } from 'ethers';
 import { Contract as EthCallContract, Provider as EthCallProvider } from 'ethers-multicall';
 import { request } from 'graphql-request'
 
-import MAINNET from 'changelog/deployment/deployment-mainnet.json';
-import GOERLI from 'changelog/deployment/deployment-goerli.json';
+import ADDRESSES_MAINNET from 'changelog/deployment/deployment-mainnet.json';
+import ADDRESSES_GOERLI from 'changelog/deployment/deployment-goerli.json';
 
 import Aer from 'changelog/abis/Aer.sol/Aer.json';
 import Codex from 'changelog/abis/Codex.sol/Codex.json';
@@ -22,7 +22,7 @@ import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
 
-import { queryVault } from './queries';
+import { queryVault, SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI } from './queries';
 
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
@@ -31,26 +31,28 @@ const WAD = ethers.utils.parseUnits('1', '18');
 
 export class FIAT {
 
-  constructor(signer, provider, subgraphUrl, chainId) {
+  constructor(signer, provider, chainId) {
+    // supported networks: 1 - Mainnet, 5 - Goerli, 1337 - Ganache
+    if (![1, 5, 1337].includes(chainId)) throw new Error('Unsupported network');
+    // assuming Ganache is running in forked mode (required for ethers-multicall)
+    chainId = (chainId === 1337) ? 1 : chainId;
+
     this.gasMultiplier = 1.3;
     this.signer = signer;
     this.provider = provider;
-    // workaround for selecting the right address for Ganache in ethers-multicall
-    this.ethcallProvider = new EthCallProvider(provider, (chainId === 1337) ? 1 : chainId);
-    this.subgraphUrl = subgraphUrl;
-    // 1 - Mainnet, 1337 - Ganache, 5 - Goerli
-    this.addresses = (chainId === 1 || chainId === 1337) ? MAINNET : (chainId === 5) ? GOERLI : null;
-    if (this.addresses === null) throw new Error('Unsupported Network');
+    this.ethcallProvider = new EthCallProvider(provider, chainId);
+    this.subgraphUrl = (chainId === 1) ? SUBGRAPH_URL_MAINNET : SUBGRAPH_URL_GOERLI;
+    this.addresses = (chainId === 1) ? ADDRESSES_MAINNET : ADDRESSES_GOERLI;
   }
 
-  static async fromProvider(provider, subgraphUrl) {
-    return new FIAT(await provider.getSigner(), provider, subgraphUrl, (await provider.getNetwork()).chainId);
+  static async fromProvider(provider) {
+    return new FIAT(await provider.getSigner(), provider, (await provider.getNetwork()).chainId);
   }
 
-  static async fromPrivateKey(web3ProviderUrl, privateKey, subgraphUrl) {
+  static async fromPrivateKey(web3ProviderUrl, privateKey) {
     const provider = new ethers.providers.JsonRpcProvider(web3ProviderUrl);
     const signer = new ethers.Wallet(privateKey, provider);
-    return new FIAT(signer, provider, subgraphUrl, (await signer.provider.getNetwork()).chainId);
+    return new FIAT(signer, provider, (await signer.provider.getNetwork()).chainId);
   }
 
   setGasMultiplier(multiplier) {
