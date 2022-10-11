@@ -16,7 +16,7 @@ yarn add @fiatdao/sdk # npm install @fiatdao/sdk
 Instantiating the SDK via an existing provider
 ```js
 const detectEthereumProvider = require('@metamask/detect-provider');
-const fiat = await fiat.fromProvider(await detedEthereumProvider());
+const fiat = await fiat.fromProvider(await detectEthereumProvider());
 ```
 
 Instantiating the SDK via private key in a node environment
