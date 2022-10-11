@@ -66,7 +66,7 @@ export class FIAT {
   }
 
   scaleToWad(amount, fromScale) {
-    if (fromScale.isZero()) return ethers.BigNumber.from(0);
+    if (fromScale.isZero()) throw new Error('Invalid value for `fromScale` - expected non-zero value');
     return amount.mul(WAD).div(fromScale);
   }
 
@@ -321,13 +321,13 @@ export class FIAT {
 
   // collateral in WAD 
   computeMaxNormalDebt(collateral, healthFactor, rate, liquidationPrice) {
-    if (healthFactor.isZero()) throw new Error('Invalid value for healthFactor - expected non-zero value');
-    if (rate.isZero()) throw new Error('Invalid value for rate - expected non-zero value');
+    if (healthFactor.isZero()) throw new Error('Invalid value for `healthFactor` - expected non-zero value');
+    if (rate.isZero()) throw new Error('Invalid value for `rate` - expected non-zero value');
     return this.debtToNormalDebt(collateral.mul(liquidationPrice).div(healthFactor), rate);
   }
 
   computeMinCollateral(healthFactor, normalDebt, rate, liquidationPrice) {
-    if (liquidationPrice.isZero()) throw new Error('Invalid value for liquidationPrice - expected non-zero value');
+    if (liquidationPrice.isZero()) throw new Error('Invalid value for `liquidationPrice` - expected non-zero value');
     const debt = this.normalDebtToDebt(normalDebt, rate);
     return healthFactor.mul(debt).div(liquidationPrice);
   }
@@ -337,7 +337,7 @@ export class FIAT {
   }
 
   debtToNormalDebt(debt, rate) {
-    if (rate.isZero()) throw new Error('Invalid value for rate - expected non-zero value');
+    if (rate.isZero()) throw new Error('Invalid value for `rate` - expected non-zero value');
     let normalDebt = debt.mul(WAD).div(rate);
     // avoid potential rounding error when converting back to debt from normalDebt
     if (normalDebt.mul(rate).div(WAD).lt(debt)) {
