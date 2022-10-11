@@ -75,6 +75,20 @@ describe('FIAT', () => {
     expect(results[2].gt(0)).toBe(true);
   });
 
+  test('encode', async () => {
+    await fiat.encode(
+      contracts.publican,
+      'collect',
+      MAINNET.vaultEPT_ePyvDAI_24FEB23.address
+    );
+    await fiat.encode(
+      contracts.publican,
+      'collect',
+      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001'}
+    );
+  });
+
   test('send', async () => {
     await fiat.send(
       contracts.publican,

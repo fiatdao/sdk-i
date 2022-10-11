@@ -144,6 +144,14 @@ export class FIAT {
     return  { contract, txRequest, txOpts };
   }
 
+  async encode(contract, method, ...args) {
+    const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
+    const gas = await _contract.estimateGas[method](...txRequest, txOpts);
+    return await _contract.populateTransaction[method](
+      ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100) }
+    );
+  }
+
   async send(contract, method, ...args) {
     const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
     const gas = await _contract.estimateGas[method](...txRequest, txOpts);
@@ -211,14 +219,6 @@ export class FIAT {
       contract.address,
       contract.interface.encodeFunctionData(method, [...txRequest]),
       txOpts
-    );
-  }
-
-  async encodeTx(contract, method, ...args) {
-    const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
-    const gas = await _contract.estimateGas[method](...txRequest, txOpts);
-    return await _contract.populateTransaction[method](
-      ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100), ...feeData }
     );
   }
 
