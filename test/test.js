@@ -1,26 +1,60 @@
+const ethers = require('ethers');
+const ganache = require('ganache');
+
 const { FIAT } = require('../lib/index');
 const { queryPositions } = require('../lib/queries');
 
 const MAINNET = require('changelog/deployment/deployment-mainnet.json');
 
+jest.setTimeout(10000);
+
 // Tests run on mainnet state at block height 15711690
 describe('FIAT', () => {
+
+  const defaultAccount = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'; // WETH contract
+  const proxyOwner = '0xCE91783D36925bCc121D0C63376A248a2851982A'; // owner of `proxy`
+  const proxy = '0x89afBc32Ad881014DB72089BbF3535aF04b8d929';
+  
+  let server;
+  let provider;
 
   let fiat;
   let contracts;
   let vaultData;
   let positionData;
   let healthFactor;
+  
+  beforeAll(async () => {
+    const options = {
+      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 15711690 },
+      miner: { defaultGasPrice: 30000000000 },
+      wallet: { unlockedAccounts: [defaultAccount, proxyOwner] },
+      logging: { quiet: true }
+    };
+    server = ganache.server(options);
+    await server.listen(8545);
+    provider = new ethers.providers.Web3Provider(server.provider);
+  });
+
+  afterAll(async () => {
+    await server.close();
+  });
+
+  test('fromSigner', async () => {
+    fiat = await FIAT.fromProvider(provider, 'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph');
+    expect(fiat != undefined).toBe(true);
+  });
 
   test('fromPrivateKey', async () => {
-    fiat = await FIAT.fromPrivateKey(
-      process.env.TENDERLY_FORK_URL_15711690,
+    const fiat_ = await FIAT.fromPrivateKey(
+      `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
       '000000000000000000000000000000000000000000000000000000000000000A',
       'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph'
     );
+    expect(fiat_ != undefined).toBe(true);
   });
 
-  test('fromPrivateKey', () => {
+  test('getContracts', () => {
     contracts = fiat.getContracts();
     expect(Object.values(contracts).length).toBeGreaterThan(0);
   });
@@ -41,12 +75,77 @@ describe('FIAT', () => {
     expect(results[2].gt(0)).toBe(true);
   });
 
+  test('send', async () => {
+    await fiat.send(
+      contracts.publican,
+      'collect',
+      MAINNET.vaultEPT_ePyvDAI_24FEB23.address
+    );
+    await fiat.send(
+      contracts.publican,
+      'collect',
+      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001'}
+    );
+  });
+
+  // Ganache returns stale data 
+  test.skip('sendViaProxy', async () => {
+    await fiat.sendViaProxy(
+      proxy,
+      contracts.publican,
+      'collect',
+      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      { from: proxyOwner }
+    );
+  });
+
+  test('sendAndWait', async () => {
+    await fiat.sendAndWait(
+      contracts.publican,
+      'collect',
+      MAINNET.vaultEPT_ePyvDAI_24FEB23.address
+    );
+  });
+
+  // Ganache returns stale data 
+  test.skip('sendAndWaitViaProxy', async () => {
+    await fiat.sendAndWaitViaProxy(
+      proxy,
+      contracts.publican,
+      'collect',
+      MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      { from: proxyOwner }
+    );
+  });
+
   test('dryrun', async () => {
     const vault = fiat.getVaultContract(MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
-    const error = await fiat.dryrun(vault, 'enter', 0, fiat.signer.address, '1000');
-    expect(error.success).toBe(false);
-    expect(error.reason.includes('ERC20: insufficient-balance')).toBe(true);
-    expect(error.customError).toBe(undefined); // .toBe('Error(string)'); // `data` field is not returned by tenderly
+
+    const resultSuccess = await fiat.dryrun(contracts.publican, 'collect', vault.address);
+    expect(resultSuccess.success).toBe(true);
+
+    const resultError = await fiat.dryrun(vault, 'enter', 0, await fiat.signer.getAddress(), '1000');
+    expect(resultError.success).toBe(false);
+    expect(resultError.reason.includes('ERC20: insufficient-balance')).toBe(true);
+    expect(resultError.customError).toBe('Error(string)'); // note: `data` field is not returned by tenderly
+  });
+
+  test('dryrunViaProxy', async () => {
+    const vault = fiat.getVaultContract(MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
+
+    // Ganache returns stale data 
+    // const resultSuccess = await fiat.dryrunViaProxy(
+    //   proxy, contracts.publican, 'collect', vault.address, { from: proxyOwner }
+    // );
+    // expect(resultSuccess.success).toBe(true);
+    
+    const resultError = await fiat.dryrunViaProxy(
+      proxy, vault, 'enter', 0, await fiat.signer.getAddress(), '1000', { from: proxyOwner }
+    );
+    expect(resultError.success).toBe(false);
+    expect(resultError.reason != undefined).toBe(true);
+    // expect(resultError.customError).toBe('Error(string)'); // Ganache returns stale data
   });
 
   test('fetchVaultData', async () => {

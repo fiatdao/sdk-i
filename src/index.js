@@ -35,14 +35,16 @@ export class FIAT {
     this.gasMultiplier = 1.3;
     this.signer = signer;
     this.provider = provider;
-    this.ethcallProvider = new EthCallProvider(provider, chainId);
+    // workaround for selecting the right address for Ganache in ethers-multicall
+    this.ethcallProvider = new EthCallProvider(provider, (chainId === 1337) ? 1 : chainId);
     this.subgraphUrl = subgraphUrl;
-    this.addresses = (chainId === 1) ? MAINNET : (chainId === 5) ? GOERLI : null;
+    // 1 - Mainnet, 1337 - Ganache, 5 - Goerli
+    this.addresses = (chainId === 1 || chainId === 1337) ? MAINNET : (chainId === 5) ? GOERLI : null;
     if (this.addresses === null) throw new Error('Unsupported Network');
   }
 
-  static async fromSigner(signer, subgraphUrl) {
-    return new FIAT(signer, signer.provider, subgraphUrl, (await signer.provider.getNetwork()).chainId);
+  static async fromProvider(provider, subgraphUrl) {
+    return new FIAT(await provider.getSigner(), provider, subgraphUrl, (await provider.getNetwork()).chainId);
   }
 
   static async fromPrivateKey(web3ProviderUrl, privateKey, subgraphUrl) {
@@ -144,13 +146,29 @@ export class FIAT {
 
   async send(contract, method, ...args) {
     const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
+    const gas = await _contract.estimateGas[method](...txRequest, txOpts);
     return await _contract[method](
-      ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100), ...feeData }
+      ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100) }
     );
   }
 
   async sendAndWait(contract, method, ...args) {
-    return await send(contract, method, ...args).wait();
+    return await (await this.send(contract, method, ...args)).wait();
+  }
+
+  async sendViaProxy(proxyAddress, targetContract, method, ...args) {
+    const { contract, txRequest, txOpts } = this.#buildTx(targetContract, ...args);
+    return await this.send(
+      this.getProxyContract(proxyAddress),
+      'execute',
+      contract.address,
+      contract.interface.encodeFunctionData(method, [...txRequest]),
+      txOpts
+    );
+  }
+
+  async sendAndWaitViaProxy(proxyAddress, targetContract, method, ...args) {
+    return await (await this.sendViaProxy(proxyAddress, targetContract, method, ...args)).wait();
   }
 
   async dryrun(contract, method, ...args) {
@@ -159,16 +177,41 @@ export class FIAT {
       const gas = await _contract.estimateGas[method](...txRequest, txOpts);
       return { success: true, gas }
     } catch (error) {
-      const reason = error.reason;
-      let customError = undefined;
-      try {
-        // assumes error returned by json rpc provider contains `data` field (tested with Alchemy)
-        customError = (await ethers.utils.fetchJson(
-          `https://www.4byte.directory/api/v1/signatures/?hex_signature=${error.error.error.data.slice(0, 10)}`
-        )).results[0].text_signature;
-      } catch (error) {}
+      let reason;
+      let customError;
+      let data;
+      // Ganache response format
+      if (error && error.data && error.data.result) {
+        reason = error.data.reason || '';
+        data = error.data.result;
+      // Alchemy response format
+      } else if (error && error.error && error.error.error && error.error.error.data) {
+        reason = error.reason;
+        data = error.error.error.data;
+      // Tenderly response format
+      } else if (error && error.reason) {
+        reason = error.reason;
+      }
+      if (data != undefined) {
+        try {
+          customError = (await ethers.utils.fetchJson(
+            `https://www.4byte.directory/api/v1/signatures/?hex_signature=${data.slice(0, 10)}`
+          )).results[0].text_signature;
+        } catch (error) {}
+      }
       return { success: false, reason, customError }
     }
+  }
+
+  async dryrunViaProxy(proxyAddress, targetContract, method, ...args) {
+    const { contract, txRequest, txOpts } = this.#buildTx(targetContract, ...args);
+    return await this.dryrun(
+      this.getProxyContract(proxyAddress),
+      'execute',
+      contract.address,
+      contract.interface.encodeFunctionData(method, [...txRequest]),
+      txOpts
+    );
   }
 
   async encodeTx(contract, method, ...args) {
