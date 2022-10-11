@@ -132,7 +132,7 @@ export class FIAT {
 
   #buildTx(contract, ...args) {
     const txRequest = [ ...args ];
-    const txOpts = txRequest[txRequest.length - 1];
+    let txOpts = txRequest[txRequest.length - 1];
     if (txOpts && Object.getPrototypeOf(txOpts) === Object.prototype) {
       if (txOpts.from) contract = contract.connect(new ethers.VoidSigner(txOpts.from, this.provider));
       delete txRequest.splice([txRequest.length - 1], 1);
@@ -143,7 +143,7 @@ export class FIAT {
   }
 
   async send(contract, method, ...args) {
-    const { _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
+    const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
     return await _contract[method](
       ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100), ...feeData }
     );
@@ -153,8 +153,26 @@ export class FIAT {
     return await send(contract, method, ...args).wait();
   }
 
+  async dryrun(contract, method, ...args) {
+    const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
+    try {
+      const gas = await _contract.estimateGas[method](...txRequest, txOpts);
+      return { success: true, gas }
+    } catch (error) {
+      const reason = error.reason;
+      let decodedError = undefined;
+      try {
+        // assumes error returned by json rpc provider contains `data` field (tested with Alchemy)
+        decodedError = (await ethers.utils.fetchJson(
+          `https://www.4byte.directory/api/v1/signatures/?hex_signature=${error.error.error.data.slice(0, 10)}`
+        )).results[0].text_signature;
+      } catch (error) {}
+      return { success: false, reason, decodedError }
+    }
+  }
+
   async encodeTx(contract, method, ...args) {
-    const { _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
+    const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
     const gas = await _contract.estimateGas[method](...txRequest, txOpts);
     return await _contract.populateTransaction[method](
       ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100), ...feeData }

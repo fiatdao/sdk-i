@@ -41,6 +41,14 @@ describe('FIAT', () => {
     expect(results[2].gt(0)).toBe(true);
   });
 
+  test('dryrun', async () => {
+    const vault = fiat.getVaultContract(MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
+    const error = await fiat.dryrun(vault, 'enter', 0, fiat.signer.address, '1000');
+    expect(error.success).toBe(false);
+    expect(error.reason.includes('ERC20: insufficient-balance')).toBe(true);
+    expect(error.decodedError).toBe(undefined); // .toBe('Error(string)'); // `data` field is not returned by tenderly
+  });
+
   test('fetchVaultData', async () => {
     vaultData = await fiat.fetchVaultData(MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase());
     expect(vaultData.properties.name).toBe('VaultEPT_ePyvDAI_24FEB23');
