@@ -1,9 +1,9 @@
 name: Publish
 
 on:
-  branch:
-    mainnet:
-      - push
+  push:
+    - branches:
+      - main
 
 jobs:
   tests:
@@ -19,7 +19,7 @@ jobs:
       - name: Install depedencies
         run: yarn
 
-       - name: Run tests
+      - name: Run tests
         env:
           ALCHEMY_API_KEY: "${{ secrets.ALCHEMY_API_KEY }}"
         run: yarn ci
