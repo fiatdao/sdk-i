@@ -329,7 +329,7 @@ export class FIAT {
           discountRate: (graphData.discountRate) ? ethers.BigNumber.from(graphData.discountRate.discountRate) : null,
           fairPrice: multicallData[3],
           liquidationPrice: multicallData[4],
-          liquidationPrice: multicallData[5]
+          faceValue: multicallData[5]
         }
       }
     }
