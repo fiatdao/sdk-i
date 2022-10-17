@@ -4,6 +4,8 @@ import { request } from 'graphql-request'
 
 import ADDRESSES_MAINNET from 'changelog/deployment/deployment-mainnet.json';
 import ADDRESSES_GOERLI from 'changelog/deployment/deployment-goerli.json';
+import METADATA_MAINNET from 'changelog/metadata/metadata-mainnet.json';
+import METADATA_GOERLI from 'changelog/metadata/metadata-goerli.json';
 
 import Aer from 'changelog/abis/Aer.sol/Aer.json';
 import Codex from 'changelog/abis/Codex.sol/Codex.json';
@@ -22,13 +24,14 @@ import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
 
-import { queryVault, SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI } from './queries';
+import { SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralType } from './queries';
 
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 
 const WAD = ethers.utils.parseUnits('1', '18');
 
+// all number values are generally expected as ethers.BigNumber unless they come from the subgraph directly
 export class FIAT {
 
   constructor(signer, provider, chainId) {
@@ -43,10 +46,17 @@ export class FIAT {
     this.ethcallProvider = new EthCallProvider(provider, chainId);
     this.subgraphUrl = (chainId === 1) ? SUBGRAPH_URL_MAINNET : SUBGRAPH_URL_GOERLI;
     this.addresses = (chainId === 1) ? ADDRESSES_MAINNET : ADDRESSES_GOERLI;
+    this.metadata = (chainId === 1) ? METADATA_MAINNET : METADATA_GOERLI;
+  }
+
+  static async fromSigner(signer) {
+    return new FIAT(signer, signer.provider, (await signer.provider.getNetwork()).chainId);
   }
 
   static async fromProvider(provider) {
-    return new FIAT(await provider.getSigner(), provider, (await provider.getNetwork()).chainId);
+    let signer;
+    try { signer = await provider.getSigner() } catch (error) {}
+    return new FIAT(signer, provider, (await provider.getNetwork()).chainId);
   }
 
   static async fromPrivateKey(web3ProviderUrl, privateKey) {
@@ -78,6 +88,12 @@ export class FIAT {
 
   toBytes32(str) {
     return ethers.utils.formatBytes32String(str);
+  }
+
+  getMetadata(address) {
+    return this.metadata[
+      Object.keys(this.metadata).find((_address) => _address.toLowerCase() === address.toLowerCase())
+    ];
   }
 
   #getContract(artifact, address) {
@@ -135,6 +151,11 @@ export class FIAT {
   }
 
   #buildTx(contract, ...args) {
+    if (this.signer == undefined) {
+      throw new Error(
+        '`signer` is unavailable - no `signer` found on `provider` - try via `fromSigner` or `fromPrivateKey` instead.'
+      );
+    }
     const txRequest = [ ...args ];
     let txOpts = txRequest[txRequest.length - 1];
     if (txOpts && Object.getPrototypeOf(txOpts) === Object.prototype) {
@@ -228,78 +249,88 @@ export class FIAT {
     return await request(this.subgraphUrl, query, variables); 
   }
 
-  async fetchVaultData(address) {
-    const { codex, collybus, limes, noLossCollateralAuction, publican } = this.getContracts();
-    const vaultContract = this.getVaultContract(address);
-    const [multicallData, graphData] = await Promise.all([
-      this.multicall([
-        { contract: codex, method: 'vaults', args: [address] },
-        { contract: collybus, method: 'vaults', args: [address] },
-        { contract: limes, method: 'vaults', args: [address] },
-        { contract: noLossCollateralAuction, method: 'vaults', args: [address] },
-        { contract: publican, method: 'vaults', args: [address] },
-        { contract: vaultContract, method: 'vaultType', args: [] },
-        { contract: vaultContract, method: 'token', args: [] },
-        { contract: vaultContract, method: 'tokenScale', args: [] },
-        { contract: vaultContract, method: 'underlierToken', args: [] },
-        { contract: vaultContract, method: 'underlierScale', args: [] },
-        { contract: vaultContract, method: 'fairPrice', args: [0, false, false] },
-        { contract: vaultContract, method: 'fairPrice', args: [0, true, false] },
-        { contract: vaultContract, method: 'fairPrice', args: [0, false, true] }
-      ]),
-      this.query(queryVault, { id: address })
-    ]);
+  async fetchCollateralTypeData(address, tokenId) {
+    const { codex, noLossCollateralAuction, publican } = this.getContracts();
+    const vault = this.getVaultContract(address);
+    let multicallData;
+    let graphData;
+    try {
+      [multicallData, { collateralType: graphData }] = await Promise.all([
+        this.multicall([
+          { contract: codex, method: 'vaults', args: [address] },
+          { contract: noLossCollateralAuction, method: 'vaults', args: [address] },
+          { contract: publican, method: 'virtualRate', args: [address] },
+          { contract: vault, method: 'fairPrice', args: [tokenId, false, false] },
+          { contract: vault, method: 'fairPrice', args: [tokenId, true, false] },
+          { contract: vault, method: 'fairPrice', args: [tokenId, false, true] }
+        ]),
+        this.query(queryCollateralType, { id: `${address.toLowerCase()}-${tokenId}` })
+      ]);
+    } catch (error) {
+      throw new Error('Invalid value for `address` or `tokenId`: ' + error);
+    }
     return {
       properties: {
+        tokenId: graphData.tokenId,
         name: graphData.vault.name,
-        vaultType: multicallData[5],
-        token: multicallData[6],
-        tokenScale: multicallData[7],
-        tokenSymbol: graphData.vault.collateralTypes[0].symbol,
-        underlierToken: multicallData[8],
-        underlierScale: multicallData[9],
-        underlierSymbol: graphData.vault.collateralTypes[0].underlierSymbol,
-        tokenIds: graphData.vault.collateralTypes.map(
-          ({ tokenId, maturity, eptData, fcData, fyData }) => ({ tokenId, maturity, ...eptData, ...fcData, ...fyData })
-        )
+        protocol: graphData.vault.protocol,
+        vaultType: graphData.vault.vaultType,
+        token: graphData.vault.token,
+        tokenScale: ethers.BigNumber.from(graphData.vault.tokenScale),
+        tokenSymbol: graphData.vault.tokenSymbol,
+        underlierToken: graphData.vault.underlier,
+        underlierScale: ethers.BigNumber.from(graphData.vault.underlierScale),
+        underlierSymbol: graphData.vault.underlierSymbol,
+        maturity: ethers.BigNumber.from(graphData.maturity),
+        eptData: graphData.eptData,
+        fcData: graphData.fcData,
+        fyData: graphData.fyData,
+      },
+      metadata: {
+        ...this.getMetadata(address)
       },
       settings: {
         codex: {
-          debtCeiling: multicallData[0].debtCeiling,
-          debtFloor: multicallData[0].debtFloor
+          debtCeiling: ethers.BigNumber.from(graphData.vault.debtCeiling),
+          debtFloor: ethers.BigNumber.from(graphData.vault.debtFloor)
         },
         collybus: {
-          liquidationRatio: multicallData[1].liquidationRatio,
-          defaultRateId: multicallData[1].defaultRateId
+          liquidationRatio: ethers.BigNumber.from(graphData.vault.liquidationRatio),
+          defaultRateId: ethers.BigNumber.from(graphData.vault.defaultRateId)
         },
         limes: {
-          liquidationPenalty: multicallData[2].liquidationPenalty,
-          collateralAuction: multicallData[2].collateralAuction
+          liquidationPenalty: ethers.BigNumber.from(graphData.vault.liquidationPenalty),
+          collateralAuction: graphData.vault.limesCollateralAuction,
+          maxDebtOnAuction: ethers.BigNumber.from(graphData.vault.maxDebtOnAuction)
         },
         collateralAuction: {
-          multiplier: multicallData[3].multiplier,
-          maxDebtOnAuction: multicallData[2].maxDebtOnAuction,
-          maxAuctionDuration: multicallData[3].maxAuctionDuration,
-          auctionDebtFloor: multicallData[3].auctionDebtFloor,
-          collybus: multicallData[3].collybus,
-          calculator: multicallData[3].calculator
+          multiplier: ethers.BigNumber.from(graphData.vault.multiplier),
+          maxAuctionDuration: ethers.BigNumber.from(graphData.vault.maxAuctionDuration),
+          auctionDebtFloor: ethers.BigNumber.from(graphData.vault.auctionDebtFloor),
+          collybus: multicallData[1].collybus,
+          calculator: multicallData[1].calculator
         }
       },
       state: {
         codex: {
           totalNormalDebt: multicallData[0].totalNormalDebt,
-          rate: multicallData[0].rate
+          rate: multicallData[0].rate,
+          virtualRate: multicallData[2]
         },
         limes: {
-          debtOnAuction: multicallData[2].debtOnAuction
+          debtOnAuction: graphData.vault.debtOnAuction
         },
         publican: {
-          interestPerSecond: multicallData[4].interestPerSecond,
-          lastCollected: multicallData[4].lastCollected
+          interestPerSecond: graphData.vault.interestPerSecond,
+          lastCollected: graphData.vault.lastCollected
         },
-        fairPrice: multicallData[10],
-        liquidationPrice: multicallData[11],
-        faceValue: multicallData[12],
+        collybus: {
+          rateId: (graphData.discountRate) ? ethers.BigNumber.from(graphData.discountRate.rateId) : null,
+          discountRate: (graphData.discountRate) ? ethers.BigNumber.from(graphData.discountRate.discountRate) : null,
+          fairPrice: multicallData[3],
+          liquidationPrice: multicallData[4],
+          liquidationPrice: multicallData[5]
+        }
       }
     }
   }

@@ -2,7 +2,11 @@ const ethers = require('ethers');
 const ganache = require('ganache');
 
 const { FIAT } = require('../lib/index');
-const { queryPositions } = require('../lib/queries');
+const {
+  queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
+  queryPosition, queryPositions, queryTransaction, queryTransactions,
+  queryUser, queryUsers, queryUserProxy, queryUserProxies
+} = require('../lib/queries');
 
 const ADDRESSES_MAINNET = require('changelog/deployment/deployment-mainnet.json');
 
@@ -20,7 +24,7 @@ describe('FIAT', () => {
 
   let fiat;
   let contracts;
-  let vaultData;
+  let collateralTypeData;
   let positionData;
   let healthFactor;
   
@@ -41,8 +45,13 @@ describe('FIAT', () => {
   });
 
   test('fromSigner', async () => {
-    fiat = await FIAT.fromProvider(provider);
+    fiat = await FIAT.fromSigner(await provider.getSigner());
     expect(fiat != undefined).toBe(true);
+  });
+
+  test('fromProvider', async () => {
+    const fiat_ = await FIAT.fromProvider(provider);
+    expect(fiat_ != undefined).toBe(true);
   });
 
   test('fromPrivateKey', async () => {
@@ -51,6 +60,11 @@ describe('FIAT', () => {
       '000000000000000000000000000000000000000000000000000000000000000A'
     );
     expect(fiat_ != undefined).toBe(true);
+  });
+
+  test('getMetadata', () => {
+    const metadata = fiat.getMetadata(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
+    expect(Object.values(metadata).length).toBeGreaterThan(0);
   });
 
   test('getContracts', () => {
@@ -161,15 +175,15 @@ describe('FIAT', () => {
     // expect(resultError.customError).toBe('Error(string)'); // Ganache returns stale data
   });
 
-  test('fetchVaultData', async () => {
-    vaultData = await fiat.fetchVaultData(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase());
-    expect(vaultData.properties.name).toBe('VaultEPT_ePyvDAI_24FEB23');
-    expect(vaultData.settings.codex.debtCeiling.gt(0)).toBe(true);
+  test('fetchCollateralTypeData', async () => {
+    collateralTypeData = await fiat.fetchCollateralTypeData(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase(), 0);
+    expect(collateralTypeData.properties.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+    expect(collateralTypeData.settings.codex.debtCeiling.gt(0)).toBe(true);
   });
 
   test('fetchPositionData', async () => {
     positionData = await fiat.fetchPositionData(
-      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address, 0, '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c'
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address, 0, '0x9763b704f3fd8d70914d2d1293da4b7c1a38702c'
     );
     expect(positionData.collateral.gt(0)).toBe(true);
     expect(positionData.normalDebt.gt(0)).toBe(true);
@@ -177,39 +191,118 @@ describe('FIAT', () => {
 
   test('computeHealthFactor', async () => {
     healthFactor = fiat.computeHealthFactor(
-      positionData.collateral, positionData.normalDebt, vaultData.state.codex.rate, vaultData.state.liquidationPrice
+      positionData.collateral, positionData.normalDebt, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.liquidationPrice
     );
     expect(fiat.wadToDec(healthFactor) > 1.0).toBe(true);
   });
 
   test('computeMaxNormalDebt', async () => {
     const normalDebt = fiat.computeMaxNormalDebt(
-      positionData.collateral, healthFactor, vaultData.state.codex.rate, vaultData.state.liquidationPrice
+      positionData.collateral, healthFactor, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.liquidationPrice
     );
     expect(normalDebt.div(1e8).eq(positionData.normalDebt.div(1e8))).toBe(true);
   });
 
   test('computeMinCollateral', async () => {
     const collateral = fiat.computeMinCollateral(
-      healthFactor, positionData.normalDebt, vaultData.state.codex.rate, vaultData.state.liquidationPrice
+      healthFactor, positionData.normalDebt, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.liquidationPrice
     );
     expect(collateral.div(1e8).eq(positionData.collateral.div(1e8))).toBe(true);
   });
 
   test('normalDebtToDebt', async () => {
-    const debt = fiat.normalDebtToDebt(positionData.normalDebt, vaultData.state.codex.rate);
+    const debt = fiat.normalDebtToDebt(positionData.normalDebt, collateralTypeData.state.codex.rate);
     expect(debt.gt(positionData.normalDebt)).toBe(true);
   });
 
   test('debtToNormalDebt', async () => {
-    const debt = fiat.normalDebtToDebt(positionData.normalDebt, vaultData.state.codex.rate);
-    const normalDebt = fiat.debtToNormalDebt(debt, vaultData.state.codex.rate);
+    const debt = fiat.normalDebtToDebt(positionData.normalDebt, collateralTypeData.state.codex.rate);
+    const normalDebt = fiat.debtToNormalDebt(debt, collateralTypeData.state.codex.rate);
     expect(normalDebt.eq(positionData.normalDebt)).toBe(true);
   });
 
-  test('query', async () => {
-    const result = await fiat.query(queryPositions, { where: { owner: '0x9763B704F3fd8d70914D2d1293Da4B7c1A38702c' } });
-    expect(result.positions[0].vaultName).toBe('VaultEPT_ePyvDAI_24FEB23');
+  test('queryVault', async () => {
+    const result = await fiat.query(
+      queryVault, { id: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase() }
+    );
+    expect(result.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryVaults', async () => {
+    const result = await fiat.query(
+      queryVaults, { where: { address: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase() } }
+    );
+    expect(result.vaults[0].name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryCollateralType', async () => {
+    const result = await fiat.query(
+      queryCollateralType, { id: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase() + '-0'}
+    );
+    expect(result.collateralType.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryCollateralTypes', async () => {
+    const result = await fiat.query(
+      queryCollateralTypes, { where: { id: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase() + '-0'} }
+    );
+    expect(result.collateralTypes[0].vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryPosition', async () => {
+    const result = await fiat.query(
+      queryPosition, { id: '0x5a92f03d9079e009325d27af884db5ebdf181eaf-0x0-0x9763b704f3fd8d70914d2d1293da4b7c1a38702c' }
+    );
+    expect(result.position.collateralType.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryPositions', async () => {
+    const result = await fiat.query(
+      queryPositions, { where: { owner: '0x9763b704f3fd8d70914d2d1293da4b7c1a38702c' } }
+    );
+    expect(result.positions[0].collateralType.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryTransaction', async () => {
+    const result = await fiat.query(
+      queryTransaction, { id: '0xec2dcdfc520a59be94ee819d7fee6a83ce6efa6ae1288b54fc6ae8e3baecfb9a' }
+    );
+    expect(result.positionTransactionAction.position.collateralType.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+  
+  test('queryTransactions', async () => {
+    const result = await fiat.query(
+      queryTransactions, { where: { position_: { owner: '0x9763b704f3fd8d70914d2d1293da4b7c1a38702c' } } }
+    );
+    expect(result.positionTransactionActions[0].position.collateralType.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryUser', async () => {
+    const result = await fiat.query(
+      queryUser, { id: '0x9763b704f3fd8d70914d2d1293da4b7c1a38702c' }
+    );
+    expect(result.user.positions[0].collateralType.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryUsers', async () => {
+    const result = await fiat.query(
+      queryUsers, { where: { address: '0x9763b704f3fd8d70914d2d1293da4b7c1a38702c' } }
+    );
+    expect(result.users[0].positions[0].collateralType.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryUserProxy', async () => {
+    const result = await fiat.query(
+      queryUserProxy, { id: '0xcd6998d20876155d37aec0db4c19d63eeaef058f' }
+    );
+    expect(result.userProxy.proxy).toBe('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
+  });
+
+  test('queryUserProxies', async () => {
+    const result = await fiat.query(
+      queryUserProxies, { where: { proxy: '0x9763b704f3fd8d70914d2d1293da4b7c1a38702c' } }
+    );
+    expect(result.userProxies[0].proxy).toBe('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
   });
 
   test('underlierToPToken', async () => {
@@ -217,8 +310,8 @@ describe('FIAT', () => {
       contracts.vaultEPTActions,
       'underlierToPToken',
       ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
-      vaultData.properties.tokenIds[0].balancerVault,
-      vaultData.properties.tokenIds[0].poolId,
+      collateralTypeData.properties.eptData.balancerVault,
+      collateralTypeData.properties.eptData.poolId,
       fiat.decToWad('100')
     );
     expect(pToken.gt(fiat.decToWad('100'))).toBe(true);

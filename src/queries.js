@@ -3,94 +3,157 @@ import { gql } from 'graphql-request'
 export const SUBGRAPH_URL_MAINNET = 'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph';
 export const SUBGRAPH_URL_GOERLI = 'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph-goerli';
 
+export const VaultFragment = gql`
+  fragment VaultFragment on Vault {
+    id
+    address
+    name
+    protocol
+    vaultType
+    token
+    tokenScale
+    tokenSymbol
+    underlier
+    underlierScale
+    underlierSymbol
+    debtFloor
+    debtCeiling
+    liquidationRatio
+    defaultRateId
+    interestPerSecond
+    multiplier
+    maxAuctionDuration
+    auctionDebtFloor
+    maxDiscount
+    limesCollateralAuction
+    liquidationPenalty
+    maxDebtOnAuction
+    debtOnAuction
+  }
+`
+
+export const CollateralTypeFragment = gql`
+  fragment CollateralTypeFragment on CollateralType {
+    id
+    tokenId
+    maturity
+    depositedCollateral
+    faceValue
+    discountRate {
+      id
+      rateId
+      discountRate
+    }
+    eptData {
+      id
+      balancerVault
+      convergentCurvePool
+      poolId
+    }
+    fcData {
+      id
+      notional
+      tenor
+    }
+    fyData {
+      id
+      yieldSpacePool
+    }
+  }
+`
+
+export const PositionFragment = gql`
+  fragment PositionFragment on Position {
+    id
+    owner
+    collateral
+    normalDebt
+    maturity
+  }
+`
+
+export const CollateralAuctionFragment = gql`
+  fragment CollateralAuctionFragment on CollateralAuction {
+    id
+    auctionId
+    isActive
+    collateralToSell
+    debt
+    startsAt
+    startPrice
+  }
+`
+
+export const TransactionFragment = gql`
+  fragment TransactionFragment on PositionTransactionAction {
+    __typename
+    id
+    transactionHash
+    collateral
+    normalDebt
+    deltaCollateral
+    deltaNormalDebt
+    timestamp
+  }
+`
+
+export const UserFragment = gql`
+  fragment UserFragment on User {
+    id
+    address
+    proxy {
+      id
+      proxy
+    }
+    credit
+    unbackedDebt
+    balances {
+      collateralType {
+        id
+      }
+      balance
+    }
+    delegated {
+      delegator {
+        id
+        address
+      }
+      delegatee {
+        id
+        address
+      }
+      hasDelegate
+    }
+    delegates {
+      delegator {
+        id
+        address
+      }
+      delegatee {
+        id
+        address
+      }
+      hasDelegate
+    }
+  }
+`
+
+export const UserProxyFragment = gql`
+  fragment UserProxyFragment on UserProxy {
+    id
+    proxy
+    owner
+  }
+`
+
 export const queryVault = gql`
+  ${VaultFragment}
+  ${CollateralTypeFragment}
   query Vault($id: ID!) {
     vault(id: $id) {
-      name
+      ...VaultFragment
       collateralTypes {
-        tokenId
-        maturity
-        symbol
-        underlierSymbol
-        eptData {
-          balancerVault
-          convergentCurvePool
-          poolId
-        }
-        fcData {
-          notional
-          tenor
-        }
-        fyData {
-          yieldSpacePool
-        }
-      }
-    }
-  }
-`
-
-export const queryPositions = gql`
-  query Positions($where: Position_filter) {
-    positions(where: $where) {
-      id
-      vaultName
-      maturity
-      collateral
-      owner
-      normalDebt
-      collateralType {
-        symbol
-        address
-        underlierSymbol
-        underlierAddress
-        tokenId
-      }
-      vault {
-        type
-        vaultType
-        address
-        maxDiscount
-        collateralizationRatio
-        interestPerSecond
-        debtFloor
-      }
-    }
-  }
-`
-
-export const queryCollateralTypes = gql`
-  query CollateralTypes(
-    $where: CollateralType_filter
-    $orderBy: CollateralType_orderBy
-    $orderDirection: OrderDirection
-  ) {
-    collateralTypes(where: $where, orderBy: $orderBy, orderDirection: $orderDirection) {
-      id
-      tokenId
-      symbol
-      underlierSymbol
-      underlierAddress
-      underlierScale
-      maturity
-      address
-      scale
-      faceValue
-      eptData {
-        id
-        balancerVault
-        convergentCurvePool
-        poolId
-      }
-      vault {
-        id
-        defaultRateId
-        type
-        collateralizationRatio
-        address
-        interestPerSecond
-        vaultType
-        debtFloor
-        name
+        ...CollateralTypeFragment
       }
     }
     collybusSpots(orderDirection: $orderDirection) {
@@ -98,95 +161,245 @@ export const queryCollateralTypes = gql`
       token
       spot
     }
-    collybusDiscountRates {
+  }
+`
+
+export const queryVaults = gql`
+  ${VaultFragment}
+  ${CollateralTypeFragment}
+  query Vault($where: Vault_filter) {
+    vaults(where: $where) {
+      ...VaultFragment
+      collateralTypes {
+        ...CollateralTypeFragment
+      }
+    }
+    collybusSpots(orderDirection: $orderDirection) {
       id
-      rateId
-      discountRate
+      token
+      spot
     }
   }
 `
 
-
-export const queryAuction = gql`
-  fragment Auction on CollateralAuction {
-    id
-    auctionId
-    isActive
-    collateralToSell
-    tokenId
-    vaultName
-    debt
-    startsAt
-    startPrice
-    user {
-      id
+export const queryCollateralType = gql`
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  query CollateralType($id: ID!) {
+    collateralType(id: $id) {
+      ...CollateralTypeFragment
+      vault {
+        ...VaultFragment
+      }
     }
-    vault {
+    collybusSpots(orderDirection: $orderDirection) {
       id
-      name
-      address
-      type
-      interestPerSecond
-      maxAuctionDuration
-      auctionDebtFloor
-    }
-    collateralType {
-      id
-      address
-      faceValue
-      maturity
-      tokenId
-      symbol
-      underlierAddress
-      underlierSymbol
-      underlierScale
+      token
+      spot
     }
   }
 `
 
-export const queryAuctionById = gql`
-  query auctionById($id: ID!) {
+export const queryCollateralTypes = gql`
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  query CollateralType($where: CollateralType_filter) {
+    collateralTypes(where: $where) {
+      ...CollateralTypeFragment
+      vault {
+        ...VaultFragment
+      }
+    }
+    collybusSpots(orderDirection: $orderDirection) {
+      id
+      token
+      spot
+    }
+  }
+`
+
+export const queryPosition = gql`
+  ${PositionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  ${UserFragment}
+  query Position($id: ID!) {
+    position(id: $id) {
+      ...PositionFragment
+      collateralType {
+        ...CollateralTypeFragment
+        vault {
+          ...VaultFragment
+        }
+      }
+      user {
+        ...UserFragment
+      }
+    }
+  }
+`
+
+export const queryPositions = gql`
+  ${PositionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  ${UserFragment}
+  query Positions($where: Position_filter) {
+    positions(where: $where) {
+      ...PositionFragment
+      collateralType {
+        ...CollateralTypeFragment
+        vault {
+          ...VaultFragment
+        }
+      }
+      user {
+        ...UserFragment
+      }
+    }
+  }
+`
+
+export const queryCollateralAuction = gql`
+  ${CollateralAuctionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  ${UserFragment}
+  query auction($id: ID!) {
     collateralAuction(id: $id) {
-      ...Auction
+      ...CollateralAuctionFragment
+      collateralType {
+        ...CollateralTypeFragment
+        vault {
+          ...VaultFragment
+        }
+      }
+      user {
+        ...UserFragment
+      }
     }
   }
 `
 
-export const queryAuctions = gql`
+export const queryCollateralAuctions = gql`
+  ${CollateralAuctionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  ${UserFragment}
   query auctions($where: CollateralAuction_filter) {
     collateralAuctions(where: $where) {
-      ...Auction
+      ...CollateralAuctionFragment
+      collateralType {
+        ...CollateralTypeFragment
+        vault {
+          ...VaultFragment
+        }
+      }
+      user {
+        ...UserFragment
+      }
+    }
+  }
+`
+
+export const queryTransaction = gql`
+  ${TransactionFragment}
+  ${PositionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  query transaction($id: ID!) {
+    positionTransactionAction(id: $id) {
+      ...TransactionFragment
+      position {
+        ...PositionFragment
+        collateralType {
+          ...CollateralTypeFragment
+          vault {
+            ...VaultFragment
+          }
+        }
+      }
     }
   }
 `
 
 export const queryTransactions = gql`
-  query Transactions($where: PositionTransactionAction_filter) {
+  ${TransactionFragment}
+  ${PositionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  query transactions($where: PositionTransactionAction_filter) {
     positionTransactionActions(where: $where) {
-      __typename
-      vaultName
-      id
-      collateral
-      deltaCollateral
-      normalDebt
-      deltaNormalDebt
-      transactionHash
-      tokenId
-      timestamp
-      user {
-        id
-      }
-      vault {
-        address
-      }
+      ...TransactionFragment
       position {
-        maturity
+        ...PositionFragment
         collateralType {
-          tokenId
-          address
-          underlierAddress
-          underlierSymbol
-          symbol
+          ...CollateralTypeFragment
+          vault {
+            ...VaultFragment
+          }
+        }
+      }
+    }
+  }
+`
+
+export const queryUser = gql`
+  ${UserFragment}
+  ${PositionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  ${CollateralAuctionFragment}
+  query user($id: ID!) {
+    user(id: $id) {
+      ...UserFragment
+      positions {
+        ...PositionFragment
+        collateralType {
+          ...CollateralTypeFragment
+          vault {
+            ...VaultFragment
+          }
+        }
+      }
+      collateralAuctions {
+        ...CollateralAuctionFragment
+        collateralType {
+          id
+          vault {
+            id
+          }
+        }
+      }
+    }
+  }
+`
+
+export const queryUsers = gql`
+  ${UserFragment}
+  ${PositionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  ${CollateralAuctionFragment}
+  query users($where: User_filter!) {
+    users(where: $where) {
+      ...UserFragment
+      positions {
+        ...PositionFragment
+        collateralType {
+          ...CollateralTypeFragment
+          vault {
+            ...VaultFragment
+          }
+        }
+      }
+      collateralAuctions {
+        ...CollateralAuctionFragment
+        collateralType {
+          id
+          vault {
+            id
+          }
         }
       }
     }
@@ -194,10 +407,71 @@ export const queryTransactions = gql`
 `
 
 export const queryUserProxy = gql`
+  ${UserProxyFragment}
+  ${UserFragment}
+  ${PositionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  ${CollateralAuctionFragment}
   query userProxy($id: ID!) {
     userProxy(id: $id) {
-      id
-      proxyAddress
+      ...UserProxyFragment
+      user {
+        ...UserFragment
+        positions {
+          ...PositionFragment
+          collateralType {
+            ...CollateralTypeFragment
+            vault {
+              ...VaultFragment
+            }
+          }
+        }
+        collateralAuctions {
+          ...CollateralAuctionFragment
+          collateralType {
+            id
+            vault {
+              id
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+export const queryUserProxies = gql`
+  ${UserProxyFragment}
+  ${UserFragment}
+  ${PositionFragment}
+  ${CollateralTypeFragment}
+  ${VaultFragment}
+  ${CollateralAuctionFragment}
+  query userProxies($where: UserProxy_filter!) {
+    userProxies(where: $where) {
+      ...UserProxyFragment
+      user {
+        ...UserFragment
+        positions {
+          ...PositionFragment
+          collateralType {
+            ...CollateralTypeFragment
+            vault {
+              ...VaultFragment
+            }
+          }
+        }
+        collateralAuctions {
+          ...CollateralAuctionFragment
+          collateralType {
+            id
+            vault {
+              id
+            }
+          }
+        }
+      }
     }
   }
 `
