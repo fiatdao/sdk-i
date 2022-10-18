@@ -18,9 +18,22 @@ export const VaultFragment = gql`
     underlierSymbol
     debtFloor
     debtCeiling
+    rate
+    totalNormalDebt
     liquidationRatio
     defaultRateId
+    defaultRateId_a {
+      id
+      rateId
+      discountRate
+    }
+    spot {
+      id
+      spot
+    }
     interestPerSecond
+    collateralAuctionCollybus
+    collateralAuctionCalculator
     multiplier
     maxAuctionDuration
     auctionDebtFloor

@@ -10,7 +10,7 @@ const {
 
 const ADDRESSES_MAINNET = require('changelog/deployment/deployment-mainnet.json');
 
-jest.setTimeout(10000);
+jest.setTimeout(50000);
 
 // Tests run on mainnet state at block height 15711690
 describe('FIAT', () => {
@@ -175,14 +175,27 @@ describe('FIAT', () => {
     // expect(resultError.customError).toBe('Error(string)'); // Ganache returns stale data
   });
 
-  test('fetchCollateralTypeData', async () => {
-    collateralTypeData = await fiat.fetchCollateralTypeData(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase(), 0);
-    expect(collateralTypeData.properties.name).toBe('VaultEPT_ePyvDAI_24FEB23');
-    expect(collateralTypeData.settings.codex.debtCeiling.gt(0)).toBe(true);
+  test('fetchCollateralTypes', async () => {
+    expect((await fiat.fetchCollateralTypes(
+      [{ vault: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase(), tokenId: 0 }]
+    ))[0].properties.name !== undefined).toBe(true);
+    expect((await fiat.fetchCollateralTypes())[1].properties.name !== undefined).toBe(true);
   });
 
-  test('fetchPositionData', async () => {
-    positionData = await fiat.fetchPositionData(
+  test('fetchCollateralTypesAndPrices', async () => {
+    collateralTypeData = (await fiat.fetchCollateralTypesAndPrices(
+      [{ vault: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase(), tokenId: 0 }]
+    ))[0];
+    expect(collateralTypeData.properties.name !== undefined).toBe(true);
+    expect((await fiat.fetchCollateralTypesAndPrices())[1].state.collybus.fairPrice !== undefined).toBe(true);
+  });
+
+  test('fetchPositions', async () => {
+    expect((await fiat.fetchPositions('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c'))[0].owner !== null).toBe(true);
+  });
+  
+  test('fetchPosition', async () => {
+    positionData = await fiat.fetchPosition(
       ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address, 0, '0x9763b704f3fd8d70914d2d1293da4b7c1a38702c'
     );
     expect(positionData.collateral.gt(0)).toBe(true);

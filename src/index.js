@@ -24,7 +24,9 @@ import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
 
-import { SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralType } from './queries';
+import {
+  SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUserProxies
+} from './queries';
 
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
@@ -249,98 +251,160 @@ export class FIAT {
     return await request(this.subgraphUrl, query, variables); 
   }
 
-  async fetchCollateralTypeData(address, tokenId) {
-    const { codex, noLossCollateralAuction, publican } = this.getContracts();
-    const vault = this.getVaultContract(address);
-    let multicallData;
-    let graphData;
-    try {
-      [multicallData, { collateralType: graphData }] = await Promise.all([
-        this.multicall([
-          { contract: codex, method: 'vaults', args: [address] },
-          { contract: noLossCollateralAuction, method: 'vaults', args: [address] },
-          { contract: publican, method: 'virtualRate', args: [address] },
-          { contract: vault, method: 'fairPrice', args: [tokenId, false, false] },
-          { contract: vault, method: 'fairPrice', args: [tokenId, true, false] },
-          { contract: vault, method: 'fairPrice', args: [tokenId, false, true] }
-        ]),
-        this.query(queryCollateralType, { id: `${address.toLowerCase()}-${tokenId}` })
-      ]);
-    } catch (error) {
-      throw new Error('Invalid value for `address` or `tokenId`: ' + error);
-    }
-    return {
-      properties: {
-        tokenId: graphData.tokenId,
-        name: graphData.vault.name,
-        protocol: graphData.vault.protocol,
-        vaultType: graphData.vault.vaultType,
-        token: graphData.vault.token,
-        tokenScale: ethers.BigNumber.from(graphData.vault.tokenScale),
-        tokenSymbol: graphData.vault.tokenSymbol,
-        underlierToken: graphData.vault.underlier,
-        underlierScale: ethers.BigNumber.from(graphData.vault.underlierScale),
-        underlierSymbol: graphData.vault.underlierSymbol,
-        maturity: ethers.BigNumber.from(graphData.maturity),
-        eptData: graphData.eptData,
-        fcData: graphData.fcData,
-        fyData: graphData.fyData,
-      },
-      metadata: {
-        ...this.getMetadata(address)
-      },
-      settings: {
-        codex: {
-          debtCeiling: ethers.BigNumber.from(graphData.vault.debtCeiling),
-          debtFloor: ethers.BigNumber.from(graphData.vault.debtFloor)
-        },
-        collybus: {
-          liquidationRatio: ethers.BigNumber.from(graphData.vault.liquidationRatio),
-          defaultRateId: ethers.BigNumber.from(graphData.vault.defaultRateId)
-        },
-        limes: {
-          liquidationPenalty: ethers.BigNumber.from(graphData.vault.liquidationPenalty),
-          collateralAuction: graphData.vault.limesCollateralAuction,
-          maxDebtOnAuction: ethers.BigNumber.from(graphData.vault.maxDebtOnAuction)
-        },
-        collateralAuction: {
-          multiplier: ethers.BigNumber.from(graphData.vault.multiplier),
-          maxAuctionDuration: ethers.BigNumber.from(graphData.vault.maxAuctionDuration),
-          auctionDebtFloor: ethers.BigNumber.from(graphData.vault.auctionDebtFloor),
-          collybus: multicallData[1].collybus,
-          calculator: multicallData[1].calculator
+  // collateralTypesFilter: [{ vault: Address, tokenId: Number }]
+  async fetchCollateralTypes(collateralTypesFilter) {
+    const graphData = await this.query(
+      queryCollateralTypes,
+      (collateralTypesFilter && collateralTypesFilter.length !== 0)
+        ? { 
+          where: {
+            id_in: collateralTypesFilter.map(({vault, tokenId}) => `${vault.toLowerCase()}-${tokenId.toString()}`) 
+          }
         }
-      },
-      state: {
-        codex: {
-          totalNormalDebt: multicallData[0].totalNormalDebt,
-          rate: multicallData[0].rate,
-          virtualRate: multicallData[2]
+        : {}
+    );
+    return graphData.collateralTypes.map((collateralType) => {
+      return {
+        properties: {
+          vault: collateralType.vault.address,
+          vaultType: ethers.utils.parseBytes32String(collateralType.vault.vaultType),
+          name: collateralType.vault.name,
+          protocol: collateralType.vault.protocol,
+          token: collateralType.vault.token,
+          tokenId: collateralType.tokenId,
+          tokenScale: ethers.BigNumber.from(collateralType.vault.tokenScale),
+          tokenSymbol: collateralType.vault.tokenSymbol,
+          underlierToken: collateralType.vault.underlier,
+          underlierScale: ethers.BigNumber.from(collateralType.vault.underlierScale),
+          underlierSymbol: collateralType.vault.underlierSymbol,
+          maturity: ethers.BigNumber.from(collateralType.maturity),
+          eptData: collateralType.eptData,
+          fcData: collateralType.fcData,
+          fyData: collateralType.fyData,
         },
-        limes: {
-          debtOnAuction: graphData.vault.debtOnAuction
+        metadata: this.getMetadata(collateralType.vault.address),
+        settings: {
+          codex: {
+            debtCeiling: ethers.BigNumber.from(collateralType.vault.debtCeiling),
+            debtFloor: ethers.BigNumber.from(collateralType.vault.debtFloor)
+          },
+          collybus: {
+            liquidationRatio: ethers.BigNumber.from(collateralType.vault.liquidationRatio),
+            defaultRateId: ethers.BigNumber.from(collateralType.vault.defaultRateId)
+          },
+          limes: {
+            liquidationPenalty: ethers.BigNumber.from(collateralType.vault.liquidationPenalty),
+            collateralAuction: collateralType.vault.limesCollateralAuction,
+            maxDebtOnAuction: ethers.BigNumber.from(collateralType.vault.maxDebtOnAuction)
+          },
+          collateralAuction: {
+            multiplier: ethers.BigNumber.from(collateralType.vault.multiplier),
+            maxAuctionDuration: ethers.BigNumber.from(collateralType.vault.maxAuctionDuration),
+            auctionDebtFloor: ethers.BigNumber.from(collateralType.vault.auctionDebtFloor),
+            collybus: collateralType.vault.collateralAuctionCollybus,
+            calculator: collateralType.vault.collateralAUctionCalculator
+          }
         },
-        publican: {
-          interestPerSecond: graphData.vault.interestPerSecond,
-          lastCollected: graphData.vault.lastCollected
-        },
-        collybus: {
-          rateId: (graphData.discountRate) ? ethers.BigNumber.from(graphData.discountRate.rateId) : null,
-          discountRate: (graphData.discountRate) ? ethers.BigNumber.from(graphData.discountRate.discountRate) : null,
-          fairPrice: multicallData[3],
-          liquidationPrice: multicallData[4],
-          faceValue: multicallData[5]
+        state: {
+          codex: {
+            totalNormalDebt: ethers.BigNumber.from(collateralType.vault.totalNormalDebt),
+            rate: ethers.BigNumber.from(collateralType.vault.rate)
+          },
+          limes: {
+            debtOnAuction: collateralType.vault.debtOnAuction
+          },
+          publican: {
+            interestPerSecond: collateralType.vault.interestPerSecond,
+            lastCollected: collateralType.vault.lastCollected
+          },
+          collybus: {
+            rateId: (collateralType.discountRate) ? ethers.BigNumber.from(collateralType.discountRate.rateId) : null,
+            discountRate: (collateralType.discountRate) ? ethers.BigNumber.from(collateralType.discountRate.discountRate) : null,
+          }
         }
-      }
-    }
+      };
+    });
   }
 
-  async fetchPositionData(vault, tokenId, owner) {
+  // collateralTypesFilter: [{ vault: Address, tokenId: Number }]
+  async fetchCollateralTypesAndPrices(collateralTypesFilter) {
+    const collateralTypes = (collateralTypesFilter && collateralTypesFilter.length)
+      ? collateralTypesFilter
+      : Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
+        [ ...collateralTypes_, ...this.metadata[vault].tokenIds.map((tokenId) => ({ vault, tokenId })) ]
+      ), []);
+
+    const contracts = this.getContracts();
+    const [priceData, collateralTypesData] = await Promise.all([
+      this.multicall(collateralTypes.reduce((calls, { vault, tokenId }) => (
+        [
+          ...calls,
+          { contract: this.getVaultContract(vault), method: 'fairPrice', args: [tokenId, false, false] },
+          { contract: this.getVaultContract(vault), method: 'fairPrice', args: [tokenId, true, false] },
+          { contract: this.getVaultContract(vault), method: 'fairPrice', args: [tokenId, false, true] },
+          { contract: contracts.publican, method: 'virtualRate', args: [vault] }
+        ]
+      ), [])),
+      this.fetchCollateralTypes(collateralTypesFilter)
+    ]);
+    
+    function getPrices(vault_, tokenId_) {
+      const index = collateralTypes.findIndex(({ vault, tokenId }) => (
+        vault.toLowerCase() === vault_.toLowerCase() && tokenId.toString() === tokenId_.toString()
+      )) * 4;
+      return {
+        fairPrice: priceData[index],
+        liquidationPrice: priceData[index + 1],
+        faceValue: priceData[index + 2],
+        virtualRate: priceData[index + 3]
+      };
+    }
+
+    return collateralTypesData.map((collateralTypeData) => {
+      const prices = getPrices(collateralTypeData.properties.vault, collateralTypeData.properties.tokenId);
+      return {
+        ...collateralTypeData,
+        state: {
+          ...collateralTypeData.state,
+          codex: {
+            ...collateralTypeData.state.codex,
+            virtualRate: prices.virtualRate
+          },
+          collybus: {
+            ...collateralTypeData.state.collybus,
+            fairPrice: prices.fairPrice,
+            liquidationPrice: prices.liquidationPrice,
+            faceValue: prices.faceValue
+          }
+        } 
+      };
+    });
+  }
+
+  async fetchPositions(address) {
+    const graphData = await Promise.all([
+      this.query(queryUserProxies, { where: { owner: address.toLowerCase() } }),
+      this.query(queryUserProxies, { where: { proxy: address.toLowerCase() } })
+    ]);
+    const positions = [...graphData[0].userProxies, ...graphData[1].userProxies].reduce((positions_, user) => (
+      [ ...positions_, ...user.user.positions.reduce((positions__, position) => ([...positions__, position]), []) ]
+    ), []);
+
+    return positions.map((position) => ({
+      owner: position.owner,
+      vault: position.collateralType.vault.address,
+      tokenId: ethers.BigNumber.from(position.collateralType.tokenId),
+      collateral: ethers.BigNumber.from(position.collateral),
+      normalDebt: ethers.BigNumber.from(position.normalDebt)
+    }));
+  }
+
+  async fetchPosition(vault, tokenId, owner) {
     const { codex } = this.getContracts();
-    const positionData = await this.call(codex, 'positions', vault, tokenId, owner);
+    const position = await this.call(codex, 'positions', vault, tokenId, owner);
     return {
-      collateral: positionData.collateral,
-      normalDebt: positionData.normalDebt,
+      collateral: position.collateral,
+      normalDebt: position.normalDebt,
     };
   }
 
