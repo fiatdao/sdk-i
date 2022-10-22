@@ -3,6 +3,8 @@ import { gql } from 'graphql-request'
 export const SUBGRAPH_URL_MAINNET = 'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph';
 export const SUBGRAPH_URL_GOERLI = 'https://api.thegraph.com/subgraphs/name/fiatdao/fiat-subgraph-goerli';
 
+
+
 export const VaultFragment = gql`
   fragment VaultFragment on Vault {
     id
@@ -123,6 +125,10 @@ export const UserFragment = gql`
     balances {
       collateralType {
         id
+        vault {
+          token
+        }
+        tokenId
       }
       balance
     }
@@ -485,6 +491,20 @@ export const queryUserProxies = gql`
           }
         }
       }
+    }
+  }
+`
+
+export const queryMeta = gql`
+  query meta {
+    _meta {
+      block {
+        number
+        hash
+        timestamp
+      }
+      deployment
+      hasIndexingErrors
     }
   }
 `

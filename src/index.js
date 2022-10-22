@@ -18,6 +18,7 @@ import Limes from 'changelog/abis/Limes.sol/Limes.json';
 import IVault from 'changelog/abis/IVault.sol/IVault.json';
 import Moneta from 'changelog/abis/Moneta.sol/Moneta.json';
 import NoLossCollateralAuction from 'changelog/abis/NoLossCollateralAuction.sol/NoLossCollateralAuction.json';
+import PRBProxyRegistry from 'changelog/abis/PRBProxyRegistry.sol/PRBProxyRegistry.json';
 import PRBProxy from 'changelog/abis/PRBProxy.sol/PRBProxy.json';
 import Publican from 'changelog/abis/Publican.sol/Publican.json';
 import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.json';
@@ -25,77 +26,96 @@ import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.jso
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
 
 import {
-  SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUserProxies
+  SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUser, queryUserProxies
 } from './queries';
 
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 
-const WAD = ethers.utils.parseUnits('1', '18');
+export const WAD = ethers.utils.parseUnits('1', '18');
+
+export function decToWad(decimal) {
+  return ethers.utils.parseEther(decimal);
+}
+
+export function wadToDec(wad) {
+  return ethers.utils.formatEther(wad);
+}
+
+export function decToScale(amount, toScale) {
+  return amount.mul(toScale);
+}
+
+export function scaleToDec(amount, fromScale) {
+  if (fromScale.isZero()) throw new Error('Invalid value for `fromScale` - expected non-zero value');
+  return amount.div(fromScale);
+}
+
+export function scaleToWad(amount, fromScale) {
+  if (fromScale.isZero()) throw new Error('Invalid value for `fromScale` - expected non-zero value');
+  return amount.mul(WAD).div(fromScale);
+}
+
+export function wadToScale(amount, toScale) {
+  return amount.mul(toScale).div(WAD);
+}
+
+export function toBytes32(str) {
+  return ethers.utils.formatBytes32String(str);
+}
+
+export function encode4Byte(contract, method) {
+  return ethers.utils.defaultAbiCoder.encode(['bytes4'], [contract.interface.getSighash(method)]);
+}
+
+export function addressesMatch(addressA, addressB) {
+  return ethers.utils.getAddress(addressA) === ethers.utils.getAddress(addressB);
+}
+
+export * from './queries';
 
 // all number values are generally expected as ethers.BigNumber unless they come from the subgraph directly
 export class FIAT {
 
-  constructor(signer, provider, chainId) {
+  constructor(signer, provider, chainId, opts) {
     // supported networks: 1 - Mainnet, 5 - Goerli, 1337 - Ganache
-    if (![1, 5, 1337].includes(chainId)) throw new Error('Unsupported network');
+    if ((![1, 5, 1337].includes(chainId)) && (!opts.subgraphUrl || !opts.addresses || !opts.metadata))
+      throw new Error('Unsupported network');
+
     // assuming Ganache is running in forked mode (required for ethers-multicall)
     chainId = (chainId === 1337) ? 1 : chainId;
 
-    this.gasMultiplier = 1.3;
     this.signer = signer;
     this.provider = provider;
     this.ethcallProvider = new EthCallProvider(provider, chainId);
-    this.subgraphUrl = (chainId === 1) ? SUBGRAPH_URL_MAINNET : SUBGRAPH_URL_GOERLI;
-    this.addresses = (chainId === 1) ? ADDRESSES_MAINNET : ADDRESSES_GOERLI;
-    this.metadata = (chainId === 1) ? METADATA_MAINNET : METADATA_GOERLI;
+    this.gasMultiplier = opts.gasMultiplier || 1.3;
+    this.subgraphUrl = opts.subgraphUrl || (chainId === 1) ? SUBGRAPH_URL_MAINNET : SUBGRAPH_URL_GOERLI;
+    this.addresses = opts.addresses || (chainId === 1) ? ADDRESSES_MAINNET : ADDRESSES_GOERLI;
+    this.metadata = opts.metadata || (chainId === 1) ? METADATA_MAINNET : METADATA_GOERLI;
   }
 
-  static async fromSigner(signer) {
-    return new FIAT(signer, signer.provider, (await signer.provider.getNetwork()).chainId);
+  static async fromSigner(signer, opts) {
+    return new FIAT(signer, signer.provider, (await signer.provider.getNetwork()).chainId, { ...opts });
   }
 
-  static async fromProvider(provider) {
+  static async fromProvider(provider, opts) {
     let signer;
     try { signer = await provider.getSigner() } catch (error) {}
-    return new FIAT(signer, provider, (await provider.getNetwork()).chainId);
+    return new FIAT(signer, provider, (await provider.getNetwork()).chainId, { ...opts });
   }
 
-  static async fromPrivateKey(web3ProviderUrl, privateKey) {
+  static async fromPrivateKey(web3ProviderUrl, privateKey, opts) {
     const provider = new ethers.providers.JsonRpcProvider(web3ProviderUrl);
     const signer = new ethers.Wallet(privateKey, provider);
-    return new FIAT(signer, provider, (await signer.provider.getNetwork()).chainId);
+    return new FIAT(signer, provider, (await signer.provider.getNetwork()).chainId, { ...opts });
   }
 
   setGasMultiplier(multiplier) {
     this.gasMultiplier = multiplier;
   }
 
-  decToWad(decimal) {
-    return ethers.utils.parseEther(decimal);
-  }
-
-  wadToDec(wad) {
-    return ethers.utils.formatEther(wad);
-  }
-
-  scaleToWad(amount, fromScale) {
-    if (fromScale.isZero()) throw new Error('Invalid value for `fromScale` - expected non-zero value');
-    return amount.mul(WAD).div(fromScale);
-  }
-
-  wadToScale(amount, toScale) {
-    return amount.mul(toScale).div(WAD);
-  }
-
-  toBytes32(str) {
-    return ethers.utils.formatBytes32String(str);
-  }
-
   getMetadata(address) {
-    return this.metadata[
-      Object.keys(this.metadata).find((_address) => _address.toLowerCase() === address.toLowerCase())
-    ];
+    return this.metadata[Object.keys(this.metadata).find((_address) => addressesMatch(_address, address))];
   }
 
   #getContract(artifact, address) {
@@ -115,6 +135,7 @@ export class FIAT {
       collybus: this.#getContract(Collybus, this.addresses['collybus'].address),
       flash: this.#getContract(Flash, this.addresses['flash'].address),
       noLossCollateralAuction: this.#getContract(NoLossCollateralAuction, this.addresses['collateralAuction'].address),
+      proxyRegistry: this.#getContract(PRBProxyRegistry, this.addresses['proxyRegistry'].address),
       vaultEPTActions: this.#getContract(VaultEPTActions, this.addresses['vaultEPTActions'].address),
       vaultFCActions: this.#getContract(VaultFCActions, this.addresses['vaultFCActions'].address),
       vaultFYActions: this.#getContract(VaultFYActions, this.addresses['vaultFYActions'].address)
@@ -135,10 +156,6 @@ export class FIAT {
 
   getERC1155Contract(address) {
     return this.#getContract(ERC1155, address);
-  }
-
-  encode4Byte(contract, method) {
-    return ethers.utils.defaultAbiCoder.encode(['bytes4'], [contract.interface.getSighash(method)]);
   }
 
   async call(contract, method, ...args) {
@@ -187,6 +204,14 @@ export class FIAT {
 
   async sendAndWait(contract, method, ...args) {
     return await (await this.send(contract, method, ...args)).wait();
+  }
+
+  async deployProxy(owner) {
+    return await this.sendAndWait(
+      this.getContracts().proxyRegistry,
+      'deployFor',
+      owner
+    );
   }
 
   async sendViaProxy(proxyAddress, targetContract, method, ...args) {
@@ -350,7 +375,7 @@ export class FIAT {
     
     function getPrices(vault_, tokenId_) {
       const index = collateralTypes.findIndex(({ vault, tokenId }) => (
-        vault.toLowerCase() === vault_.toLowerCase() && tokenId.toString() === tokenId_.toString()
+        addressesMatch(vault, vault_) && tokenId.toString() === tokenId_.toString()
       )) * 4;
       return {
         fairPrice: priceData[index],
@@ -381,31 +406,33 @@ export class FIAT {
     });
   }
 
-  async fetchPositions(address) {
+  // user: either owner of a Position or owner of a Proxy which is the owner of a Position
+  async fetchUserData(user) {
     const graphData = await Promise.all([
-      this.query(queryUserProxies, { where: { owner: address.toLowerCase() } }),
-      this.query(queryUserProxies, { where: { proxy: address.toLowerCase() } })
+      this.query(queryUser, { id: user.toLowerCase() }),
+      this.query(queryUserProxies, { where: { owner: user.toLowerCase() } })
     ]);
-    const positions = [...graphData[0].userProxies, ...graphData[1].userProxies].reduce((positions_, user) => (
-      [ ...positions_, ...user.user.positions.reduce((positions__, position) => ([...positions__, position]), []) ]
-    ), []);
 
-    return positions.map((position) => ({
-      owner: position.owner,
-      vault: position.collateralType.vault.address,
-      tokenId: ethers.BigNumber.from(position.collateralType.tokenId),
-      collateral: ethers.BigNumber.from(position.collateral),
-      normalDebt: ethers.BigNumber.from(position.normalDebt)
+    return [graphData[0].user, ...graphData[1].userProxies.map(({ user }) => user)].map((user) => ({
+      user: user.address,
+      proxy: (user.proxy) ? { isProxy: true, owner: user.proxy.owner } : null,
+      credit: ethers.BigNumber.from(user.credit),
+      unbackedDebt: ethers.BigNumber.from(user.unbackedDebt),
+      balances: user.balances.map((balance) => ({
+        collateralType: { token: balance.collateralType.vault.token, tokenId: balance.collateralType.tokenId },
+        balance: ethers.BigNumber.from(balance.balance)
+      })),
+      delegated: user.delegated.map(({ address }) => address),
+      delegates: user.delegates.map(({ address }) => address),
+      positions: user.positions.map((position) => ({
+        owner: position.owner,
+        vault: position.collateralType.vault.address,
+        token: position.collateralType.vault.token,
+        tokenId: ethers.BigNumber.from(position.collateralType.tokenId),
+        collateral: ethers.BigNumber.from(position.collateral),
+        normalDebt: ethers.BigNumber.from(position.normalDebt)
+      }))
     }));
-  }
-
-  async fetchPosition(vault, tokenId, owner) {
-    const { codex } = this.getContracts();
-    const position = await this.call(codex, 'positions', vault, tokenId, owner);
-    return {
-      collateral: position.collateral,
-      normalDebt: position.normalDebt,
-    };
   }
 
   // collateral in WAD 

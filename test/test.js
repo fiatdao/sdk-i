@@ -1,11 +1,11 @@
 const ethers = require('ethers');
 const ganache = require('ganache');
 
-const { FIAT } = require('../lib/index');
+const { FIAT, decToWad, wadToDec } = require('../lib/index');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
   queryPosition, queryPositions, queryTransaction, queryTransactions,
-  queryUser, queryUsers, queryUserProxy, queryUserProxies
+  queryUser, queryUsers, queryUserProxy, queryUserProxies, queryMeta
 } = require('../lib/queries');
 
 const ADDRESSES_MAINNET = require('changelog/deployment/deployment-mainnet.json');
@@ -50,16 +50,23 @@ describe('FIAT', () => {
   });
 
   test('fromProvider', async () => {
-    const fiat_ = await FIAT.fromProvider(provider);
-    expect(fiat_ != undefined).toBe(true);
+    expect(await FIAT.fromProvider(provider) != undefined).toBe(true);
+    expect(await FIAT.fromProvider(provider, { subgraphUrl: '...' }) != undefined).toBe(true);
+    const server_ = ganache.server({ chain: { chainId: 100 } });
+    await server_.listen(8555);
+    const provider_ = new ethers.providers.Web3Provider(server_.provider);
+    expect(await FIAT.fromProvider(
+      provider_, { subgraphUrl: '...', addresses: {}, metadata: {} }
+    ) != undefined).toBe(true);
+    expect(FIAT.fromProvider(provider_)).rejects.toThrow();
+    await server_.close();
   });
 
   test('fromPrivateKey', async () => {
-    const fiat_ = await FIAT.fromPrivateKey(
+    expect(await FIAT.fromPrivateKey(
       `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
       '000000000000000000000000000000000000000000000000000000000000000A'
-    );
-    expect(fiat_ != undefined).toBe(true);
+    ) != undefined).toBe(true);
   });
 
   test('getMetadata', () => {
@@ -114,6 +121,10 @@ describe('FIAT', () => {
       ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
       { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001'}
     );
+  });
+
+  test('deployProxy', async () => {
+    await fiat.deployProxy(await (await provider.getSigner()).getAddress());
   });
 
   // Ganache returns stale data 
@@ -190,23 +201,18 @@ describe('FIAT', () => {
     expect((await fiat.fetchCollateralTypesAndPrices())[1].state.collybus.fairPrice !== undefined).toBe(true);
   });
 
-  test('fetchPositions', async () => {
-    expect((await fiat.fetchPositions('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c'))[0].owner !== null).toBe(true);
+  test('fetchUserData', async () => {
+    const userData = await fiat.fetchUserData('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
+    expect(userData[0].proxy != null).toBe(true);
+    expect(userData[0].positions[0].collateral != null).toBe(true);
+    positionData = { collateral: userData[0].positions[0].collateral, normalDebt: userData[0].positions[0].normalDebt };
   });
   
-  test('fetchPosition', async () => {
-    positionData = await fiat.fetchPosition(
-      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address, 0, '0x9763b704f3fd8d70914d2d1293da4b7c1a38702c'
-    );
-    expect(positionData.collateral.gt(0)).toBe(true);
-    expect(positionData.normalDebt.gt(0)).toBe(true);
-  });
-
   test('computeHealthFactor', async () => {
     healthFactor = fiat.computeHealthFactor(
       positionData.collateral, positionData.normalDebt, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.liquidationPrice
     );
-    expect(fiat.wadToDec(healthFactor) > 1.0).toBe(true);
+    expect(wadToDec(healthFactor) > 1.0).toBe(true);
   });
 
   test('computeMaxNormalDebt', async () => {
@@ -239,6 +245,11 @@ describe('FIAT', () => {
       queryVault, { id: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase() }
     );
     expect(result.vault.name).toBe('VaultEPT_ePyvDAI_24FEB23');
+  });
+
+  test('queryMeta', async () => {
+    const result = await fiat.query(queryMeta);
+    expect(result._meta.block.hash != null).toBe(true);
   });
 
   test('queryVaults', async () => {
@@ -325,8 +336,8 @@ describe('FIAT', () => {
       ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
       collateralTypeData.properties.eptData.balancerVault,
       collateralTypeData.properties.eptData.poolId,
-      fiat.decToWad('100')
+      decToWad('100')
     );
-    expect(pToken.gt(fiat.decToWad('100'))).toBe(true);
+    expect(pToken.gt(decToWad('100'))).toBe(true);
   });
 });
