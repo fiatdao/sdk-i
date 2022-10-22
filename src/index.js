@@ -68,7 +68,7 @@ export function encode4Byte(contract, method) {
   return ethers.utils.defaultAbiCoder.encode(['bytes4'], [contract.interface.getSighash(method)]);
 }
 
-export function addressesMatch(addressA, addressB) {
+export function addressEq(addressA, addressB) {
   return ethers.utils.getAddress(addressA) === ethers.utils.getAddress(addressB);
 }
 
@@ -115,7 +115,7 @@ export class FIAT {
   }
 
   getMetadata(address) {
-    return this.metadata[Object.keys(this.metadata).find((_address) => addressesMatch(_address, address))];
+    return this.metadata[Object.keys(this.metadata).find((_address) => addressEq(_address, address))];
   }
 
   #getContract(artifact, address) {
@@ -375,7 +375,7 @@ export class FIAT {
     
     function getPrices(vault_, tokenId_) {
       const index = collateralTypes.findIndex(({ vault, tokenId }) => (
-        addressesMatch(vault, vault_) && tokenId.toString() === tokenId_.toString()
+        addressEq(vault, vault_) && tokenId.toString() === tokenId_.toString()
       )) * 4;
       return {
         fairPrice: priceData[index],
@@ -407,15 +407,14 @@ export class FIAT {
   }
 
   // user: either owner of a Position or owner of a Proxy which is the owner of a Position
-  async fetchUserData(user) {
+  async fetchUserData(userOrProxyOwner) {
     const graphData = await Promise.all([
-      this.query(queryUser, { id: user.toLowerCase() }),
-      this.query(queryUserProxies, { where: { owner: user.toLowerCase() } })
+      this.query(queryUser, { id: userOrProxyOwner.toLowerCase() }),
+      this.query(queryUserProxies, { where: { owner: userOrProxyOwner.toLowerCase() } })
     ]);
-
-    return [graphData[0].user, ...graphData[1].userProxies.map(({ user }) => user)].map((user) => ({
+    return [graphData[0].user, ...graphData[1].userProxies.map(({ user }) => user)].filter((e) => e).map((user) => ({
       user: user.address,
-      proxy: (user.proxy) ? { isProxy: true, owner: user.proxy.owner } : null,
+      isProxy: (user.proxy && !addressEq(user.proxy.owner, userOrProxyOwner)),
       credit: ethers.BigNumber.from(user.credit),
       unbackedDebt: ethers.BigNumber.from(user.unbackedDebt),
       balances: user.balances.map((balance) => ({

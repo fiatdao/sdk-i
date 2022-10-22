@@ -119,6 +119,7 @@ export const UserFragment = gql`
     proxy {
       id
       proxy
+      owner
     }
     credit
     unbackedDebt

@@ -38,6 +38,7 @@ describe('FIAT', () => {
     server = ganache.server(options);
     await server.listen(8545);
     provider = new ethers.providers.Web3Provider(server.provider);
+    fiat = await FIAT.fromSigner(await provider.getSigner());
   });
 
   afterAll(async () => {
@@ -45,8 +46,8 @@ describe('FIAT', () => {
   });
 
   test('fromSigner', async () => {
-    fiat = await FIAT.fromSigner(await provider.getSigner());
-    expect(fiat != undefined).toBe(true);
+    const fiat_ = await FIAT.fromSigner(await provider.getSigner());
+    expect(fiat_ != undefined).toBe(true);
   });
 
   test('fromProvider', async () => {
@@ -201,11 +202,15 @@ describe('FIAT', () => {
     expect((await fiat.fetchCollateralTypesAndPrices())[1].state.collybus.fairPrice !== undefined).toBe(true);
   });
 
-  test('fetchUserData', async () => {
+   test('fetchUserData', async () => {
     const userData = await fiat.fetchUserData('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
-    expect(userData[0].proxy != null).toBe(true);
+    expect(userData[0].isProxy).toBe(true);
     expect(userData[0].positions[0].collateral != null).toBe(true);
     positionData = { collateral: userData[0].positions[0].collateral, normalDebt: userData[0].positions[0].normalDebt };
+    const userData2 = await fiat.fetchUserData('0xcD6998D20876155D37aEC0dB4C19d63EEAEf058F');
+    expect(userData2[0].isProxy).toBe(false);
+    const userData3 = await fiat.fetchUserData(defaultAccount);
+    expect(userData3.length === 0).toBe(true);
   });
   
   test('computeHealthFactor', async () => {
