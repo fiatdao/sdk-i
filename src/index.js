@@ -414,7 +414,7 @@ export class FIAT {
     ]);
     return [graphData[0].user, ...graphData[1].userProxies.map(({ user }) => user)].filter((e) => e).map((user) => ({
       user: user.address,
-      isProxy: (user.proxy && !addressEq(user.proxy.owner, userOrProxyOwner)),
+      isProxy: (user.proxy && addressEq(user.proxy.proxy, user.address)),
       credit: ethers.BigNumber.from(user.credit),
       unbackedDebt: ethers.BigNumber.from(user.unbackedDebt),
       balances: user.balances.map((balance) => ({

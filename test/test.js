@@ -208,9 +208,11 @@ describe('FIAT', () => {
     expect(userData[0].positions[0].collateral != null).toBe(true);
     positionData = { collateral: userData[0].positions[0].collateral, normalDebt: userData[0].positions[0].normalDebt };
     const userData2 = await fiat.fetchUserData('0xcD6998D20876155D37aEC0dB4C19d63EEAEf058F');
-    expect(userData2[0].isProxy).toBe(false);
+    expect(userData2[0].isProxy).toBe(true);
     const userData3 = await fiat.fetchUserData(defaultAccount);
     expect(userData3.length === 0).toBe(true);
+    const userData4 = await fiat.fetchUserData('0xF1A7dA08F6cb83069817d2D8F6e55E4F2D6C0834');
+    expect(userData4[0].isProxy).toBe(true);
   });
   
   test('computeHealthFactor', async () => {
