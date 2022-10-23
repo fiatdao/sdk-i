@@ -32,32 +32,39 @@ import {
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 
+export const ZERO = ethers.constants.Zero;
+
 export const WAD = ethers.utils.parseUnits('1', '18');
 
+// decimal: BigNumberish -> BigNumber
 export function decToWad(decimal) {
-  return ethers.utils.parseEther(decimal);
+  return ethers.utils.parseUnits(String(decimal), '18');
 }
 
+// wad: BigNumberish -> string
 export function wadToDec(wad) {
-  return ethers.utils.formatEther(wad);
+  return ethers.utils.formatUnits(wad, '18');
 }
 
+// amount: BigNumberish, toScale: BigNumberish -> BigNumber
 export function decToScale(amount, toScale) {
-  return amount.mul(toScale);
+  return ethers.utils.parseUnits(String(amount), String(toScale.toString().length - 1));
 }
 
+// amount: BigNumberish, fromScale: BigNumberish -> string
 export function scaleToDec(amount, fromScale) {
-  if (fromScale.isZero()) throw new Error('Invalid value for `fromScale` - expected non-zero value');
-  return amount.div(fromScale);
+  return ethers.utils.formatUnits(amount, String(fromScale.toString().length - 1));
 }
 
+// amount: BigNumberish, fromScale: BigNumberish -> BigNumber
 export function scaleToWad(amount, fromScale) {
-  if (fromScale.isZero()) throw new Error('Invalid value for `fromScale` - expected non-zero value');
-  return amount.mul(WAD).div(fromScale);
+  if (ethers.BigNumber.from(fromScale.toString()).isZero()) return ZERO;
+  return ethers.BigNumber.from(amount.toString()).mul(WAD).div(fromScale.toString());
 }
 
-export function wadToScale(amount, toScale) {
-  return amount.mul(toScale).div(WAD);
+// amount: BigNumberish, fromScale: BigNumberish -> BigNumber
+export function wadToScale(wad, toScale) {
+  return ethers.BigNumber.from(wad.toString()).mul(toScale.toString()).div(WAD);
 }
 
 export function toBytes32(str) {

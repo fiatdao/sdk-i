@@ -1,7 +1,7 @@
 const ethers = require('ethers');
 const ganache = require('ganache');
 
-const { FIAT, decToWad, wadToDec } = require('../lib/index');
+const { FIAT, ZERO, WAD, decToWad, wadToDec, decToScale, scaleToDec, scaleToWad, wadToScale } = require('../lib/index');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
   queryPosition, queryPositions, queryTransaction, queryTransactions,
@@ -11,6 +11,63 @@ const {
 const ADDRESSES_MAINNET = require('changelog/deployment/deployment-mainnet.json');
 
 jest.setTimeout(50000);
+
+describe('Utils', () => {
+
+  test('decToWad', () => {
+    expect(decToWad(0).eq(ZERO)).toBe(true);
+    expect(decToWad(0.1).eq(ethers.BigNumber.from('100000000000000000'))).toBe(true);
+    expect(decToWad('0.1').eq(ethers.BigNumber.from('100000000000000000'))).toBe(true);
+    expect(decToWad(ethers.BigNumber.from(1)).eq(WAD)).toBe(true);
+  });
+
+  test('wadToDec', () => {
+    expect(Number(wadToDec(0)) == 0).toBe(true);
+    expect(Number(wadToDec(1000000000000000)) == 0.001).toBe(true);
+    expect(Number(wadToDec('100000000000000000')) == 0.1).toBe(true);
+    expect(Number(wadToDec(WAD)) == 1).toBe(true);
+  });
+
+  test('decToScale', () => {
+    expect(decToScale(0, 0).eq(ZERO)).toBe(true);
+    expect(decToScale(0, '0').eq(ZERO)).toBe(true);
+    expect(decToScale(0, ZERO).eq(ZERO)).toBe(true);
+    expect(decToScale(0, WAD).eq(ZERO)).toBe(true);
+    expect(decToScale(0.1, WAD).eq(ethers.BigNumber.from('100000000000000000'))).toBe(true);
+    expect(decToScale('0.1', WAD).eq(ethers.BigNumber.from('100000000000000000'))).toBe(true);
+    expect(decToScale(ethers.BigNumber.from(1), WAD).eq(WAD)).toBe(true);
+  });
+
+  test('scaleToDec', () => {
+    expect(Number(scaleToDec(0, 0)) == 0).toBe(true);
+    expect(Number(scaleToDec(0, '0')) == 0).toBe(true);
+    expect(Number(scaleToDec(0, ZERO)) == 0).toBe(true);
+    expect(Number(scaleToDec(0, WAD)) == 0).toBe(true);
+    expect(Number(scaleToDec(1000000000000000, WAD)) == 0.001).toBe(true);
+    expect(Number(scaleToDec('100000000000000000', WAD)) == 0.1).toBe(true);
+    expect(Number(scaleToDec(WAD, WAD)) == 1).toBe(true);
+  });
+
+  test('scaleToWad', () => {
+    expect(scaleToWad(0, 0).eq(ZERO)).toBe(true);
+    expect(scaleToWad(0, '0').eq(ZERO)).toBe(true);
+    expect(scaleToWad(0, ZERO).eq(ZERO)).toBe(true);
+    expect(scaleToWad(0, 1).eq(ZERO)).toBe(true);
+    expect(scaleToWad(1, 1).eq(WAD)).toBe(true);
+    expect(scaleToWad('1', 1).eq(WAD)).toBe(true);
+    expect(scaleToWad(ethers.BigNumber.from(1), 1).eq(WAD)).toBe(true);
+  });
+
+  test('wadToScale', () => {
+    expect(Number(wadToScale(0, 0)) == 0).toBe(true);
+    expect(Number(wadToScale(0, '0')) == 0).toBe(true);
+    expect(Number(wadToScale(0, ZERO)) == 0).toBe(true);
+    expect(Number(wadToScale(0, WAD)) == 0).toBe(true);
+    expect(Number(wadToScale(1000000000000000000, '1')) == 1).toBe(true);
+    expect(Number(wadToScale('1000000000000000000', '1')) == 1).toBe(true);
+    expect(Number(wadToScale(WAD, '1')) == 1).toBe(true);
+  });
+});
 
 // Tests run on mainnet state at block height 15711690
 describe('FIAT', () => {
