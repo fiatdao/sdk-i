@@ -79,6 +79,12 @@ export function addressEq(addressA, addressB) {
   return ethers.utils.getAddress(addressA) === ethers.utils.getAddress(addressB);
 }
 
+// TODO: Add this (after typescript supp is in :) )
+// const convertToHumanReadableValue = (value: BigNumber, scale: number): string => {
+//   const parts = ethers.utils.commify(scaleToDec(value, scale)).toString().split('.')
+//   return parts[0] + '.' + parts[1].slice(0,2)
+// }
+
 export * from './queries';
 
 // all number values are generally expected as ethers.BigNumber unless they come from the subgraph directly

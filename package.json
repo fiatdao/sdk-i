@@ -1,17 +1,18 @@
 {
   "name": "@fiatdao/sdk",
-  "version": "0.0.7",
+  "version": "0.0.8",
+  "description": "Javascript library for interacting with the FIAT protocol's contracts",
   "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
   "license": "MIT",
   "scripts": {
-    "build": "rm -rf ./lib && babel ./src -d ./lib",
+    "build": "rm -rf ./lib && tsc && babel ./src -d ./lib",
     "ci": "yarn build && jest",
     "test": "yarn build && source ./.env && jest"
   },
   "files": [
     "lib/",
     "src/",
-    ".babelrc",
     "README.md",
     "yarn.lock"
   ],
