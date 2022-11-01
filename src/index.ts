@@ -89,6 +89,13 @@ export * from './queries';
 
 // all number values are generally expected as ethers.BigNumber unless they come from the subgraph directly
 export class FIAT {
+  signer;
+  provider;
+  ethcallProvider;
+  gasMultiplier;
+  subgraphUrl;
+  addresses;
+  metadata;
 
   constructor(signer, provider, chainId, opts) {
     // supported networks: 1 - Mainnet, 5 - Goerli, 1337 - Ganache
@@ -133,7 +140,7 @@ export class FIAT {
 
   #getContract(artifact, address) {
     const contract = new ethers.ContractFactory(artifact.abi, artifact.bytecode, this.signer).attach(address);
-    contract.abi = artifact.abi;
+    // contract.abi = artifact.abi;
     return contract;
   }
 
@@ -192,7 +199,8 @@ export class FIAT {
     let txOpts = txRequest[txRequest.length - 1];
     if (txOpts && Object.getPrototypeOf(txOpts) === Object.prototype) {
       if (txOpts.from) contract = contract.connect(new ethers.VoidSigner(txOpts.from, this.provider));
-      delete txRequest.splice([txRequest.length - 1], 1);
+      // TODO: do we need this? seems like it's not doing anything
+      // delete txRequest.splice([txRequest.length - 1], 1);
     } else {
       txOpts = {};
     }
@@ -365,7 +373,7 @@ export class FIAT {
   }
 
   // collateralTypesFilter: [{ vault: Address, tokenId: Number }]
-  async fetchCollateralTypesAndPrices(collateralTypesFilter) {
+  async fetchCollateralTypesAndPrices(collateralTypesFilter: Array<any>) {
     const collateralTypes = (collateralTypesFilter && collateralTypesFilter.length)
       ? collateralTypesFilter
       : Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
