@@ -345,6 +345,7 @@ export class FIAT {
         },
         state: {
           codex: {
+            depositedCollateral: ethers.BigNumber.from(collateralType.depositedCollateral),
             totalNormalDebt: ethers.BigNumber.from(collateralType.vault.totalNormalDebt),
             rate: ethers.BigNumber.from(collateralType.vault.rate)
           },
