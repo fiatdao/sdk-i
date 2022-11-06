@@ -140,7 +140,6 @@ export class FIAT {
 
   #getContract(artifact, address) {
     const contract = new ethers.ContractFactory(artifact.abi, artifact.bytecode, this.signer).attach(address);
-    // contract.abi = artifact.abi;
     return contract;
   }
 
@@ -184,7 +183,7 @@ export class FIAT {
 
   async multicall(calls) {
     const multicall = calls.map(({ contract, method, args }) => {
-      return (new EthCallContract(contract.address, contract.abi))[method](...args);
+      return (new EthCallContract(contract.address, contract.interface.fragments))[method](...args);
     });
     return await this.ethcallProvider.all(multicall);
   }
