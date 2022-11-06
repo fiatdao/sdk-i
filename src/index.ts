@@ -24,6 +24,7 @@ import Publican from 'changelog/abis/Publican.sol/Publican.json';
 import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.json';
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
+import { CollateralTypesFilter } from './types';
 
 import {
   SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUser, queryUserProxies
@@ -296,7 +297,7 @@ export class FIAT {
   }
 
   // collateralTypesFilter: [{ vault: Address, tokenId: Number }]
-  async fetchCollateralTypes(collateralTypesFilter) {
+  async fetchCollateralTypes(collateralTypesFilter: CollateralTypesFilter) {
     const graphData = await this.query(
       queryCollateralTypes,
       (collateralTypesFilter && collateralTypesFilter.length !== 0)
@@ -371,7 +372,7 @@ export class FIAT {
   }
 
   // collateralTypesFilter: [{ vault: Address, tokenId: Number }]
-  async fetchCollateralTypesAndPrices(collateralTypesFilter: Array<any>) {
+  async fetchCollateralTypesAndPrices(collateralTypesFilter: CollateralTypesFilter) {
     const collateralTypes = (collateralTypesFilter && collateralTypesFilter.length)
       ? collateralTypesFilter
       : Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
