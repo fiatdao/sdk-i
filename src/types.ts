@@ -98,6 +98,7 @@ export interface State {
 export interface CodexState {
   totalNormalDebt: BigNumber;
   rate: BigNumber;
+  virtualRate? : BigNumber; // fetchCollateralTypesAndPrices
 }
 
 export interface LimesState {
@@ -107,8 +108,11 @@ export interface LimesState {
 export interface PublicanState {
   interestPerSecond: string;
 }
- 
+
 export interface CollybusState {
   rateId?: BigNumber | null;
   discountRate?: BigNumber | null;
+  fairPrice?: BigNumber; // fetchCollateralTypesAndPrices
+  liquidationPrice?: BigNumber; // fetchCollateralTypesAndPrices
+  faceValue?: BigNumber; // fetchCollateralTypesAndPrices
 }

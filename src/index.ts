@@ -372,7 +372,7 @@ export class FIAT {
   }
 
   // collateralTypesFilter: [{ vault: Address, tokenId: Number }]
-  async fetchCollateralTypesAndPrices(collateralTypesFilter: CollateralTypesFilter) {
+  async fetchCollateralTypesAndPrices(collateralTypesFilter: CollateralTypesFilter) : Promise<CollateralTypes> {
     const collateralTypes = (collateralTypesFilter && collateralTypesFilter.length)
       ? collateralTypesFilter
       : Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
@@ -422,7 +422,7 @@ export class FIAT {
             faceValue: prices.faceValue
           }
         } 
-      };
+      } as CollateralType;
     });
   }
 
