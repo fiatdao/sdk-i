@@ -198,8 +198,7 @@ export class FIAT {
     let txOpts = txRequest[txRequest.length - 1];
     if (txOpts && Object.getPrototypeOf(txOpts) === Object.prototype) {
       if (txOpts.from) contract = contract.connect(new ethers.VoidSigner(txOpts.from, this.provider));
-      // TODO: do we need this? seems like it's not doing anything
-      // delete txRequest.splice([txRequest.length - 1], 1);
+      txRequest.splice(-1, 1);
     } else {
       txOpts = {};
     }
