@@ -116,3 +116,33 @@ export interface CollybusState {
   liquidationPrice?: BigNumber; // fetchCollateralTypesAndPrices
   faceValue?: BigNumber; // fetchCollateralTypesAndPrices
 }
+
+export interface UserData {
+  user: string;
+  isProxy: boolean;
+  credit: BigNumber;
+  unbackedDebt: BigNumber;
+  balances?: (Balances)[] | null;
+  delegated?: (null)[] | null; // todo
+  delegates?: (null)[] | null; // todo
+  positions?: (Positions)[] | null;
+}
+
+export interface Balances {
+  collateralType: BalanceCollateralType;
+  balance: BigNumber;
+}
+
+export interface BalanceCollateralType {
+  token: string;
+  tokenId: string;
+}
+
+export interface Positions {
+  owner: string;
+  vault: string;
+  token: string;
+  tokenId: BigNumber;
+  collateral: BigNumber;
+  normalDebt: BigNumber;
+}

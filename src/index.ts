@@ -24,7 +24,7 @@ import Publican from 'changelog/abis/Publican.sol/Publican.json';
 import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.json';
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
-import { CollateralTypes, CollateralType, CollateralTypesFilter } from './types';
+import { CollateralTypes, CollateralType, CollateralTypesFilter, UserData } from './types';
 
 import {
   SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUser, queryUserProxies
@@ -427,7 +427,7 @@ export class FIAT {
   }
 
   // user: either owner of a Position or owner of a Proxy which is the owner of a Position
-  async fetchUserData(userOrProxyOwner) {
+  async fetchUserData(userOrProxyOwner: string) : Promise<UserData[]> {
     const graphData = await Promise.all([
       this.query(queryUser, { id: userOrProxyOwner.toLowerCase() }),
       this.query(queryUserProxies, { where: { owner: userOrProxyOwner.toLowerCase() } })
@@ -451,7 +451,7 @@ export class FIAT {
         collateral: ethers.BigNumber.from(position.collateral),
         normalDebt: ethers.BigNumber.from(position.normalDebt)
       }))
-    }));
+    } as UserData ));
   }
 
   // collateral in WAD 
