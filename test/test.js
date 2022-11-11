@@ -87,7 +87,7 @@ describe('FIAT', () => {
   
   beforeAll(async () => {
     const options = {
-      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 15711690 },
+      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 15949520 },
       miner: { defaultGasPrice: 30000000000 },
       wallet: { unlockedAccounts: [defaultAccount, proxyOwner] },
       logging: { quiet: true }
