@@ -75,6 +75,10 @@ export const CollateralTypeFragment = gql`
     sptData {
       id
       spacePool
+      balancerVault
+      maturity
+      adapter
+      target
     }
   }
 `
