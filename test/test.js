@@ -87,7 +87,7 @@ describe('FIAT', () => {
   
   beforeAll(async () => {
     const options = {
-      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 15949520 },
+      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 15957377 },
       miner: { defaultGasPrice: 30000000000 },
       wallet: { unlockedAccounts: [defaultAccount, proxyOwner] },
       logging: { quiet: true }
@@ -257,6 +257,8 @@ describe('FIAT', () => {
     ))[0];
     expect(collateralTypeData.properties.name !== undefined).toBe(true);
     expect((await fiat.fetchCollateralTypesAndPrices())[1].state.collybus.fairPrice !== undefined).toBe(true);
+
+    console.log(await fiat.fetchCollateralTypesAndPrices());
   });
 
    test('fetchUserData', async () => {
