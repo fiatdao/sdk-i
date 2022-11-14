@@ -78,81 +78,33 @@ export interface Urls {
 }
 
 export interface Settings {
-  codex: CodexSettings;
-  collybus: CollybusSettings;
-  limes: LimesSettings;
-  collateralAuction: CollateralAuctionSettings;
-}
-export interface CodexSettings {
-  debtCeiling: BigNumber;
-  debtFloor: BigNumber;
-}
-
-export interface CollybusSettings {
-  liquidationRatio: BigNumber;
-  defaultRateId: BigNumber;
-}
-
-export interface LimesSettings {
-  liquidationPenalty: BigNumber;
-  collateralAuction: string;
-  maxDebtOnAuction: BigNumber;
-}
-
-export interface CollateralAuctionSettings {
-  multiplier: BigNumber;
-  maxAuctionDuration: BigNumber;
-  auctionDebtFloor: BigNumber;
-  collybus: string;
+  codex: any;
+  collybus: any;
+  limes: any;
+  collateralAuction: any;
 }
 
 export interface State {
-  codex: CodexState;
-  limes: LimesState;
-  publican: PublicanState;
-  collybus: CollybusState;
-}
-export interface CodexState {
-  totalNormalDebt: BigNumber;
-  rate: BigNumber;
-  virtualRate? : BigNumber; // fetchCollateralTypesAndPrices
-}
-
-export interface LimesState {
-  debtOnAuction: string;
-}
-
-export interface PublicanState {
-  interestPerSecond: string;
-}
-
-export interface CollybusState {
-  rateId?: BigNumber | null;
-  discountRate?: BigNumber | null;
-  fairPrice?: BigNumber; // fetchCollateralTypesAndPrices
-  liquidationPrice?: BigNumber; // fetchCollateralTypesAndPrices
-  faceValue?: BigNumber; // fetchCollateralTypesAndPrices
+  codex: any;
+  limes: any;
+  publican: any;
+  collybus: any;
 }
 
 export interface UserData {
-  user: string;
-  isProxy: boolean;
+  balances?: Balances[];
   credit: BigNumber;
+  delegated?: any[];
+  delegates?: any[];
+  isProxy: boolean;
+  positions?: Positions[] | null;
   unbackedDebt: BigNumber;
-  balances?: (Balances)[] | null;
-  delegated?: (null)[] | null; // todo
-  delegates?: (null)[] | null; // todo
-  positions?: (Positions)[] | null;
+  user: string;
 }
 
 export interface Balances {
-  collateralType: BalanceCollateralType;
+  collateralType: any;
   balance: BigNumber;
-}
-
-export interface BalanceCollateralType {
-  token: string;
-  tokenId: string;
 }
 
 export interface Positions {
