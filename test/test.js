@@ -142,6 +142,7 @@ describe('FIAT', () => {
   });
 
   test('multicall', async () => {
+    console.log('contract codex')
     const results = await fiat.multicall([
       { contract: contracts.codex, method: 'globalDebt', args: [] },
       { contract: contracts.codex, method: 'globalUnbackedDebt', args: [] },

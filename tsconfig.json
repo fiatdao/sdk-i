@@ -5,7 +5,10 @@
     "declarationDir": "lib",
     "allowJs": true,
     "pretty": true,
-    "target": "es5"
+    "target": "es2015",
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true
   },
   "include": ["./src/**/*"],
   "exclude": [

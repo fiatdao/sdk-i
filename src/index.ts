@@ -24,6 +24,7 @@ import Publican from 'changelog/abis/Publican.sol/Publican.json';
 import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.json';
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
+import { CollateralTypes, CollateralType, CollateralTypesFilter, UserData } from './types';
 import VaultSPTActions from 'changelog/abis/VaultSPTActions.sol/VaultSPTActions.json';
 
 import {
@@ -89,6 +90,13 @@ export * from './queries';
 
 // all number values are generally expected as ethers.BigNumber unless they come from the subgraph directly
 export class FIAT {
+  signer;
+  provider;
+  ethcallProvider;
+  gasMultiplier;
+  subgraphUrl;
+  addresses;
+  metadata;
 
   constructor(signer, provider, chainId, opts) {
     // supported networks: 1 - Mainnet, 5 - Goerli, 1337 - Ganache
@@ -133,7 +141,6 @@ export class FIAT {
 
   #getContract(artifact, address) {
     const contract = new ethers.ContractFactory(artifact.abi, artifact.bytecode, this.signer).attach(address);
-    contract.abi = artifact.abi;
     return contract;
   }
 
@@ -178,7 +185,7 @@ export class FIAT {
 
   async multicall(calls) {
     const multicall = calls.map(({ contract, method, args }) => {
-      return (new EthCallContract(contract.address, contract.abi))[method](...args);
+      return (new EthCallContract(contract.address, contract.interface.fragments))[method](...args);
     });
     return await this.ethcallProvider.all(multicall);
   }
@@ -193,7 +200,7 @@ export class FIAT {
     let txOpts = txRequest[txRequest.length - 1];
     if (txOpts && Object.getPrototypeOf(txOpts) === Object.prototype) {
       if (txOpts.from) contract = contract.connect(new ethers.VoidSigner(txOpts.from, this.provider));
-      delete txRequest.splice([txRequest.length - 1], 1);
+      txRequest.splice(-1, 1);
     } else {
       txOpts = {};
     }
@@ -291,7 +298,7 @@ export class FIAT {
   }
 
   // collateralTypesFilter: [{ vault: Address, tokenId: Number }]
-  async fetchCollateralTypes(collateralTypesFilter) {
+  async fetchCollateralTypes(collateralTypesFilter: CollateralTypesFilter) : Promise<CollateralTypes> {
     const graphData = await this.query(
       queryCollateralTypes,
       (collateralTypesFilter && collateralTypesFilter.length !== 0)
@@ -367,12 +374,12 @@ export class FIAT {
             discountRate: (collateralType.discountRate) ? ethers.BigNumber.from(collateralType.discountRate.discountRate) : null,
           }
         }
-      };
+      } as CollateralType;
     });
   }
 
   // collateralTypesFilter: [{ vault: Address, tokenId: Number }]
-  async fetchCollateralTypesAndPrices(collateralTypesFilter) {
+  async fetchCollateralTypesAndPrices(collateralTypesFilter: CollateralTypesFilter) : Promise<CollateralTypes> {
     const collateralTypes = (collateralTypesFilter && collateralTypesFilter.length)
       ? collateralTypesFilter
       : Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
@@ -423,12 +430,12 @@ export class FIAT {
             faceValue: prices.faceValue
           }
         } 
-      };
+      } as CollateralType;
     });
   }
 
   // user: either owner of a Position or owner of a Proxy which is the owner of a Position
-  async fetchUserData(userOrProxyOwner) {
+  async fetchUserData(userOrProxyOwner: string) : Promise<UserData[]> {
     const graphData = await Promise.all([
       this.query(queryUser, { id: userOrProxyOwner.toLowerCase() }),
       this.query(queryUserProxies, { where: { owner: userOrProxyOwner.toLowerCase() } })
@@ -452,7 +459,7 @@ export class FIAT {
         collateral: ethers.BigNumber.from(position.collateral),
         normalDebt: ethers.BigNumber.from(position.normalDebt)
       }))
-    }));
+    } as UserData ));
   }
 
   // collateral in WAD 
