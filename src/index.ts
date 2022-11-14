@@ -25,6 +25,7 @@ import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
 import { CollateralTypes, CollateralType, CollateralTypesFilter, UserData } from './types';
+import VaultSPTActions from 'changelog/abis/VaultSPTActions.sol/VaultSPTActions.json';
 
 import {
   SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUser, queryUserProxies
@@ -80,7 +81,6 @@ export function addressEq(addressA, addressB) {
   return ethers.utils.getAddress(addressA) === ethers.utils.getAddress(addressB);
 }
 
-// TODO: Add this (after typescript supp is in :) )
 // const convertToHumanReadableValue = (value: BigNumber, scale: number): string => {
 //   const parts = ethers.utils.commify(scaleToDec(value, scale)).toString().split('.')
 //   return parts[0] + '.' + parts[1].slice(0,2)
@@ -158,7 +158,8 @@ export class FIAT {
       proxyRegistry: this.#getContract(PRBProxyRegistry, this.addresses['proxyRegistry'].address),
       vaultEPTActions: this.#getContract(VaultEPTActions, this.addresses['vaultEPTActions'].address),
       vaultFCActions: this.#getContract(VaultFCActions, this.addresses['vaultFCActions'].address),
-      vaultFYActions: this.#getContract(VaultFYActions, this.addresses['vaultFYActions'].address)
+      vaultFYActions: this.#getContract(VaultFYActions, this.addresses['vaultFYActions'].address),
+      vaultSPTActions: this.#getContract(VaultSPTActions, this.addresses['vaultSPTActions'].address)
     }
   }
 
@@ -326,6 +327,7 @@ export class FIAT {
           eptData: collateralType.eptData,
           fcData: collateralType.fcData,
           fyData: collateralType.fyData,
+          sptData: collateralType.sptData,
         },
         metadata: this.getMetadata(collateralType.vault.address),
         settings: {
@@ -352,6 +354,7 @@ export class FIAT {
         },
         state: {
           codex: {
+            depositedCollateral: ethers.BigNumber.from(collateralType.depositedCollateral),
             totalNormalDebt: ethers.BigNumber.from(collateralType.vault.totalNormalDebt),
             rate: ethers.BigNumber.from(collateralType.vault.rate)
           },
