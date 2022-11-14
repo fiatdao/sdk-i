@@ -26,16 +26,33 @@ export interface Properties {
   underlierScale: BigNumber;
   underlierSymbol: string;
   maturity: BigNumber;
-  eptData: EptData;
-  fcData?: null;
-  fyData?: null;
+  eptData?: EptData;
+  fcData?: FcData;
+  fyData?: FyData;
+  sptData?: SptData;
 }
 
 export interface EptData {
-  id: string;
   balancerVault: string;
   convergentCurvePool: string;
   poolId: string;
+}
+
+export interface FcData {
+  notional: string;
+  tenor: string;
+}
+
+export interface FyData {
+  yieldSpacePool: string;
+}
+
+export interface SptData {
+  adapter: string;
+  balancerVault: string;
+  maturity: string;
+  spacePool: string;
+  target: string;
 }
 
 export interface Metadata {
