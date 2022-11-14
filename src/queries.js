@@ -16,6 +16,8 @@ export const VaultFragment = gql`
     underlier
     underlierScale
     underlierSymbol
+    live
+    collybus
     debtFloor
     debtCeiling
     rate

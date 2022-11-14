@@ -323,6 +323,7 @@ export class FIAT {
           underlierToken: collateralType.vault.underlier,
           underlierScale: ethers.BigNumber.from(collateralType.vault.underlierScale),
           underlierSymbol: collateralType.vault.underlierSymbol,
+          collybus: collateralType.vault.collybus,
           maturity: ethers.BigNumber.from(collateralType.maturity),
           eptData: collateralType.eptData,
           fcData: collateralType.fcData,
@@ -353,6 +354,9 @@ export class FIAT {
           }
         },
         state: {
+          vault: {
+            live: collateralType.vault.live
+          },
           codex: {
             depositedCollateral: ethers.BigNumber.from(collateralType.depositedCollateral),
             totalNormalDebt: ethers.BigNumber.from(collateralType.vault.totalNormalDebt),
@@ -400,6 +404,7 @@ export class FIAT {
       const index = collateralTypes.findIndex(({ vault, tokenId }) => (
         addressEq(vault, vault_) && tokenId.toString() === tokenId_.toString()
       )) * 4;
+      if (index === -1) return { fairPrice: ZERO, liquidationPrice: ZERO, faceValue: ZERO, virtualRate: ZERO };  
       return {
         fairPrice: priceData[index],
         liquidationPrice: priceData[index + 1],
