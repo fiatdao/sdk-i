@@ -132,7 +132,7 @@ export class FIAT {
   }
 
   #getContract(artifact, address) {
-    const contract = new ethers.ContractFactory(artifact.abi, artifact.bytecode, this.signer).attach(address);
+    const contract = new ethers.Contract(address, artifact.abi, this.signer ?? this.provider)
     contract.abi = artifact.abi;
     return contract;
   }
