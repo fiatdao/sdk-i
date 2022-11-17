@@ -138,9 +138,10 @@ describe('FIAT', () => {
     expect(Object.values(contracts).length).toBeGreaterThan(0);
   });
 
-  test('getContractFactories', () => {
-    contractFactories = fiat.getContractFactories();
-    expect(Object.values(contractFactories).length).toBeGreaterThan(0);
+  test('getContractsFromProvider', async () => {
+    const fiat_ = await FIAT.fromProvider(provider);
+    const contractsFromProvider = fiat.getContracts();
+    expect(Object.values(contractsFromProvider).length).toBeGreaterThan(0);
   });
 
   test('call', async () => {
@@ -150,10 +151,6 @@ describe('FIAT', () => {
   test('callProvider', async () => {
     const fiat_ = await FIAT.fromProvider(provider);
     expect((await fiat_.call(contracts.codex, 'globalDebt')).gt(0)).toBe(true);
-  });
-
-  test('callFactory', async () => {
-    expect((await fiat.call(contractFactories.codex, 'globalDebt')).gt(0)).toBe(true);
   });
 
   test('multicall', async () => {
