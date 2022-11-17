@@ -81,7 +81,6 @@ describe('FIAT', () => {
 
   let fiat;
   let contracts;
-  let contractFactories;
   let collateralTypeData;
   let positionData;
   let healthFactor;
