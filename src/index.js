@@ -137,6 +137,12 @@ export class FIAT {
     return contract;
   }
 
+  #getContractFactory(artifact, address) {
+    const contract = new ethers.ContractFactory(artifact.abi, artifact.bytecode, this.signer).attach(address);
+    contract.abi = artifact.abi;
+    return contract;
+  }
+
   getContracts() {
     return {
       aer: this.#getContract(Aer, this.addresses['aer'].address),
@@ -153,6 +159,25 @@ export class FIAT {
       vaultFCActions: this.#getContract(VaultFCActions, this.addresses['vaultFCActions'].address),
       vaultFYActions: this.#getContract(VaultFYActions, this.addresses['vaultFYActions'].address),
       vaultSPTActions: this.#getContract(VaultSPTActions, this.addresses['vaultSPTActions'].address)
+    }
+  }
+
+  getContractFactories() {
+    return {
+      aer: this.#getContractFactory(Aer, this.addresses['aer'].address),
+      codex: this.#getContractFactory(Codex, this.addresses['codex'].address),
+      limes: this.#getContractFactory(Limes, this.addresses['limes'].address),
+      moneta: this.#getContractFactory(Moneta, this.addresses['moneta'].address),
+      publican: this.#getContractFactory(Publican, this.addresses['publican'].address),
+      fiat: this.#getContractFactory(FIATToken, this.addresses['fiat'].address),
+      collybus: this.#getContractFactory(Collybus, this.addresses['collybus'].address),
+      flash: this.#getContractFactory(Flash, this.addresses['flash'].address),
+      noLossCollateralAuction: this.#getContractFactory(NoLossCollateralAuction, this.addresses['collateralAuction'].address),
+      proxyRegistry: this.#getContractFactory(PRBProxyRegistry, this.addresses['proxyRegistry'].address),
+      vaultEPTActions: this.#getContractFactory(VaultEPTActions, this.addresses['vaultEPTActions'].address),
+      vaultFCActions: this.#getContractFactory(VaultFCActions, this.addresses['vaultFCActions'].address),
+      vaultFYActions: this.#getContractFactory(VaultFYActions, this.addresses['vaultFYActions'].address),
+      vaultSPTActions: this.#getContractFactory(VaultSPTActions, this.addresses['vaultSPTActions'].address)
     }
   }
 
