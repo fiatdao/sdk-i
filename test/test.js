@@ -83,7 +83,7 @@ describe('FIAT', () => {
   let contracts;
   let collateralTypeData;
   let positionData;
-  let healthFactor;
+  let collateralizationRatio;
   
   beforeAll(async () => {
     const options = {
@@ -283,23 +283,23 @@ describe('FIAT', () => {
     expect(userData4[0].isProxy).toBe(true);
   });
   
-  test('computeHealthFactor', async () => {
-    healthFactor = fiat.computeHealthFactor(
-      positionData.collateral, positionData.normalDebt, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.liquidationPrice
+  test('computeCollateralizationRatio', async () => {
+    collateralizationRatio = fiat.computeCollateralizationRatio(
+      positionData.collateral, collateralTypeData.state.collybus.fairPrice, positionData.normalDebt, collateralTypeData.state.codex.rate
     );
-    expect(wadToDec(healthFactor) > 1.0).toBe(true);
+    expect(wadToDec(collateralizationRatio) > 1.0).toBe(true);
   });
 
   test('computeMaxNormalDebt', async () => {
     const normalDebt = fiat.computeMaxNormalDebt(
-      positionData.collateral, healthFactor, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.liquidationPrice
+      positionData.collateral, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.fairPrice, collateralizationRatio
     );
     expect(normalDebt.div(1e8).eq(positionData.normalDebt.div(1e8))).toBe(true);
   });
 
   test('computeMinCollateral', async () => {
     const collateral = fiat.computeMinCollateral(
-      healthFactor, positionData.normalDebt, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.liquidationPrice
+      positionData.normalDebt, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.fairPrice, collateralizationRatio
     );
     expect(collateral.div(1e8).eq(positionData.collateral.div(1e8))).toBe(true);
   });
