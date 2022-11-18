@@ -268,8 +268,6 @@ describe('FIAT', () => {
     ))[0];
     expect(collateralTypeData.properties.name !== undefined).toBe(true);
     expect((await fiat.fetchCollateralTypesAndPrices())[1].state.collybus.fairPrice !== undefined).toBe(true);
-
-    console.log(await fiat.fetchCollateralTypesAndPrices());
   });
 
    test('fetchUserData', async () => {
