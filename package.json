@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "build": "rm -rf ./lib && tsc && babel ./src -d ./lib",
+    "bump": "yarn upgrade changelog",
     "ci": "yarn build && jest",
     "test": "yarn build && source ./.env && jest"
   },
