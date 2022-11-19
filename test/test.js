@@ -232,10 +232,12 @@ describe('FIAT', () => {
     const resultSuccess = await fiat.dryrun(contracts.publican, 'collect', vault.address);
     expect(resultSuccess.success).toBe(true);
 
-    const resultError = await fiat.dryrun(vault, 'enter', 0, await fiat.signer.getAddress(), '1000');
-    expect(resultError.success).toBe(false);
-    expect(resultError.reason.includes('ERC20: insufficient-balance')).toBe(true);
-    expect(resultError.customError).toBe('Error(string)'); // note: `data` field is not returned by tenderly
+    try {
+      const resultError = await fiat.dryrun(vault, 'enter', 0, await fiat.signer.getAddress(), '1000');
+    } catch (e) {
+      expect(e.message.includes('ERC20: insufficient-balance'));
+      expect(e.message.includes('Error(string)')); // note: `data` field is not returned by tenderly
+    }
   });
 
   test('dryrunViaProxy', async () => {
@@ -247,12 +249,13 @@ describe('FIAT', () => {
     // );
     // expect(resultSuccess.success).toBe(true);
     
-    const resultError = await fiat.dryrunViaProxy(
-      proxy, vault, 'enter', 0, await fiat.signer.getAddress(), '1000', { from: proxyOwner }
-    );
-    expect(resultError.success).toBe(false);
-    expect(resultError.reason != undefined).toBe(true);
-    // expect(resultError.customError).toBe('Error(string)'); // Ganache returns stale data
+    try {
+      const resultError = await fiat.dryrunViaProxy(
+        proxy, vault, 'enter', 0, await fiat.signer.getAddress(), '1000', { from: proxyOwner }
+      );
+    } catch (e) {
+      expect(e.message).not.toBe('');
+    }
   });
 
   test('fetchCollateralTypes', async () => {
