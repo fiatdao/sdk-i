@@ -25,6 +25,8 @@ import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
 import VaultSPTActions from 'changelog/abis/VaultSPTActions.sol/VaultSPTActions.json';
+import LeverEPTActions from 'changelog/abis/LeverEPTActions.sol/LeverEPTActions.json';
+import LeverSPTActions from 'changelog/abis/LeverSPTActions.sol/LeverSPTActions.json';
 
 import {
   SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUser, queryUserProxies
@@ -132,18 +134,16 @@ export class FIAT {
   }
 
   #getContract(artifact, address) {
-    if (!this.signer) {
-      const contract = new ethers.Contract(address, artifact.abi, this.provider)
-      contract.abi = artifact.abi;
-      return contract;
-    }
-    const contract = new ethers.ContractFactory(artifact.abi, artifact.bytecode, this.signer).attach(address);
+    const contract = (this.signer == undefined)
+      ? new ethers.Contract(address, artifact.abi, this.provider)
+      : new ethers.ContractFactory(artifact.abi, artifact.bytecode, this.signer).attach(address);
+    // ABI artifact is not directly exposed by ethers
     contract.abi = artifact.abi;
     return contract;
   }
 
   getContracts() {
-    return {
+    const contracts = {
       aer: this.#getContract(Aer, this.addresses['aer'].address),
       codex: this.#getContract(Codex, this.addresses['codex'].address),
       limes: this.#getContract(Limes, this.addresses['limes'].address),
@@ -154,11 +154,22 @@ export class FIAT {
       flash: this.#getContract(Flash, this.addresses['flash'].address),
       noLossCollateralAuction: this.#getContract(NoLossCollateralAuction, this.addresses['collateralAuction'].address),
       proxyRegistry: this.#getContract(PRBProxyRegistry, this.addresses['proxyRegistry'].address),
-      vaultEPTActions: this.#getContract(VaultEPTActions, this.addresses['vaultEPTActions'].address),
-      vaultFCActions: this.#getContract(VaultFCActions, this.addresses['vaultFCActions'].address),
-      vaultFYActions: this.#getContract(VaultFYActions, this.addresses['vaultFYActions'].address),
-      vaultSPTActions: this.#getContract(VaultSPTActions, this.addresses['vaultSPTActions'].address)
-    }
+    };
+    
+    if (this.addresses['vaultEPTActions'])
+      contracts['vaultEPTActions'] = this.#getContract(VaultEPTActions, this.addresses['vaultEPTActions'].address);
+    if (this.addresses['vaultFCActions'])
+      contracts['vaultFCActions'] = this.#getContract(VaultFCActions, this.addresses['vaultFCActions'].address);
+    if (this.addresses['vaultFYActions'])
+      contracts['vaultFYActions'] = this.#getContract(VaultFYActions, this.addresses['vaultFYActions'].address);
+    if (this.addresses['vaultSPTActions'])
+      contracts['vaultSPTActions'] = this.#getContract(VaultSPTActions, this.addresses['vaultSPTActions'].address);
+    if (this.addresses['leverEPTActions'])
+      contracts['leverEPTActions'] = this.#getContract(LeverEPTActions, this.addresses['leverEPTActions'].address);
+    if (this.addresses['leverSPTActions'])
+      contracts['leverSPTActions'] = this.#getContract(LeverSPTActions, this.addresses['leverSPTActions'].address);
+
+    return contracts;
   }
 
   getVaultContract(address) {
@@ -191,7 +202,7 @@ export class FIAT {
   #buildTx(contract, ...args) {
     if (this.signer == undefined) {
       throw new Error(
-        '`signer` is unavailable - no `signer` found on `provider` - try via `fromSigner` or `fromPrivateKey` instead.'
+        '`signer` is unavailable - no `signer` found on `provider` - use `fromSigner` or `fromPrivateKey` instead.'
       );
     }
     const txRequest = [ ...args ];
