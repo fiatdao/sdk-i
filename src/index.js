@@ -276,7 +276,7 @@ export class FIAT {
           )).results[0].text_signature;
         } catch (error) {}
       }
-      return { success: false, reason, customError }
+      throw new Error(reason ?`${reason}. ${customError}` : customError);
     }
   }
 
