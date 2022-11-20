@@ -259,27 +259,26 @@ export class FIAT {
     return await (await this.sendViaProxy(proxyAddress, targetContract, method, ...args)).wait();
   }
 
+  async estimateGas(contract, method, ...args) {
+    const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
+    return await _contract.estimateGas[method](...txRequest, txOpts);
+  }
+
   async dryrun(contract, method, ...args) {
     const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
     try {
-      const gas = await _contract.estimateGas[method](...txRequest, txOpts);
-      return { success: true, gas }
+      const result = await _contract.callStatic[method](...txRequest, txOpts);
+      return { success: true, result }
     } catch (error) {
       let reason;
       let customError;
       let data;
-      // Ganache response format
-      if (error && error.data && error.data.result) {
-        reason = error.data.reason || '';
-        data = error.data.result;
-      // Alchemy response format
-      } else if (error && error.error && error.error.error && error.error.error.data) {
-        reason = error.reason;
-        data = error.error.error.data;
-      // Tenderly response format
-      } else if (error && error.reason) {
-        reason = error.reason;
+
+      if (error && error.error && error.error.stack && error.error.data) {
+        reason = error.error.stack.split('\n')[0].replace('CallError: ', '');
+        data = error.error.data;
       }
+
       if (data != undefined) {
         try {
           customError = (await ethers.utils.fetchJson(
@@ -287,7 +286,7 @@ export class FIAT {
           )).results[0].text_signature;
         } catch (error) {}
       }
-      throw new Error(reason ?`${reason}. ${customError}` : customError);
+      return { success: false, reason, customError, error }
     }
   }
 

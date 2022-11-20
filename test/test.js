@@ -96,6 +96,7 @@ describe('FIAT', () => {
     await server.listen(8545);
     provider = new ethers.providers.Web3Provider(server.provider);
     fiat = await FIAT.fromSigner(await provider.getSigner());
+    contracts = fiat.getContracts();
   });
 
   afterAll(async () => {
@@ -133,13 +134,12 @@ describe('FIAT', () => {
   });
 
   test('getContracts', () => {
-    contracts = fiat.getContracts();
     expect(Object.values(contracts).length).toBeGreaterThan(0);
   });
 
   test('getContractsFromProvider', async () => {
     const fiat_ = await FIAT.fromProvider(provider);
-    const contractsFromProvider = fiat.getContracts();
+    const contractsFromProvider = fiat_.getContracts();
     expect(Object.values(contractsFromProvider).length).toBeGreaterThan(0);
   });
 
@@ -228,16 +228,66 @@ describe('FIAT', () => {
 
   test('dryrun', async () => {
     const vault = fiat.getVaultContract(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
+    const result = await fiat.estimateGas(contracts.publican, 'collect', vault.address);
+    expect(result.gt(0)).toBe(true);
+  });
+
+  test('dryrun', async () => {
+    const vault = fiat.getVaultContract(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
 
     const resultSuccess = await fiat.dryrun(contracts.publican, 'collect', vault.address);
     expect(resultSuccess.success).toBe(true);
 
-    try {
-      const resultError = await fiat.dryrun(vault, 'enter', 0, await fiat.signer.getAddress(), '1000');
-    } catch (e) {
-      expect(e.message.includes('ERC20: insufficient-balance'));
-      expect(e.message.includes('Error(string)')); // note: `data` field is not returned by tenderly
-    }
+    const resultErrorGanache = await fiat.dryrun(vault, 'enter', 0, await fiat.signer.getAddress(), '1000');
+    expect(resultErrorGanache.success).toBe(false);
+    expect(resultErrorGanache.reason.includes('ERC20: insufficient-balance')).toBe(true);
+    expect(resultErrorGanache.customError).toBe('Error(string)'); // note: `data` field is not returned by tenderly
+
+    const fiat_ = await FIAT.fromPrivateKey(
+      `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+      '000000000000000000000000000000000000000000000000000000000000000A'
+    );
+    const resultErrorAlchemy = await fiat_.dryrun(vault, 'enter', 0, await fiat_.signer.getAddress(), '1000');
+    expect(resultErrorAlchemy.success).toBe(false);
+    expect(resultErrorAlchemy.reason.includes('ERC20: insufficient-balance')).toBe(true);
+    expect(resultErrorAlchemy.customError).toBe('Error(string)');
+
+    const fiat__ = await FIAT.fromPrivateKey(
+      `https://rpc.tenderly.co/fork/${process.env.TENDERLY_API_KEY}`,
+      '000000000000000000000000000000000000000000000000000000000000000A'
+    );
+    const resultErrorTenderly = await fiat__.dryrun(vault, 'enter', 0, await fiat__.signer.getAddress(), '1000');
+    expect(resultErrorTenderly.success).toBe(false);
+    expect(resultErrorTenderly.reason.includes('ERC20: insufficient-balance')).toBe(true);
+    expect(resultErrorTenderly.customError).toBe('Error(string)');
+  });
+
+  test('dryrun - view', async () => {
+    const collateralTypeData_ = (await fiat.fetchCollateralTypesAndPrices(
+      [{ vault: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase(), tokenId: 0 }]
+    ))[0];
+    const resultSuccess = await fiat.dryrun(
+      contracts.vaultEPTActions,
+      'underlierToPToken',
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      collateralTypeData_.properties.eptData.balancerVault,
+      collateralTypeData_.properties.eptData.poolId,
+      decToWad('100')
+    );
+    expect(resultSuccess.success).toBe(true);
+    expect(resultSuccess.result.gt(0)).toBe(true);
+
+    const resultError = await fiat.dryrun(
+      contracts.vaultEPTActions,
+      'underlierToPToken',
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      collateralTypeData_.properties.eptData.balancerVault,
+      collateralTypeData_.properties.eptData.poolId,
+      decToWad('1000000000000000')
+    );
+    expect(resultError.success).toBe(false);
+    expect(resultError.reason).toBe('VM Exception while processing transaction: revert BAL#001');
+    expect(resultError.customError).toBe('Error(string)');
   });
 
   test('dryrunViaProxy', async () => {
@@ -249,13 +299,13 @@ describe('FIAT', () => {
     // );
     // expect(resultSuccess.success).toBe(true);
     
-    try {
-      const resultError = await fiat.dryrunViaProxy(
-        proxy, vault, 'enter', 0, await fiat.signer.getAddress(), '1000', { from: proxyOwner }
-      );
-    } catch (e) {
-      expect(e.message).not.toBe('');
-    }
+    const resultError = await fiat.dryrunViaProxy(
+      proxy, vault, 'enter', 0, await fiat.signer.getAddress(), '1000', { from: proxyOwner }
+    );
+    expect(resultError.success).toBe(false);
+    expect(resultError.reason != undefined).toBe(true);
+    // Ganache returns stale data it should be Error(string)
+    expect(resultError.customError).toBe('VaultEPT__enter_notLive()');
   });
 
   test('fetchCollateralTypes', async () => {
