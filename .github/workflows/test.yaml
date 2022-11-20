@@ -21,4 +21,5 @@ jobs:
       - name: Run tests
         env:
           ALCHEMY_API_KEY: "${{ secrets.ALCHEMY_API_KEY }}"
+          TENDERLY_API_KEY: "${{ secrets.TENDERLY_API_KEY }}"
         run: yarn ci
