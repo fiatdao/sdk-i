@@ -226,7 +226,7 @@ describe('FIAT', () => {
     );
   });
 
-  test('dryrun', async () => {
+  test('estimateGas', async () => {
     const vault = fiat.getVaultContract(ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address);
     const result = await fiat.estimateGas(contracts.publican, 'collect', vault.address);
     expect(result.gt(0)).toBe(true);
