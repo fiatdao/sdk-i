@@ -10,7 +10,7 @@ const {
   computeCollateralizationRatio, computeMaxNormalDebt, computeMinCollateral
 } = require('../lib/borrow');
 const {
-  computeMinCollateralizationRatio, computeMaxCollateralizationRatio, computeFlashloanDeposit
+  minCRForLeveredDeposit, maxCRForLeveredDeposit, computeLeveredDeposit
 } = require('../lib/lever');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
@@ -151,9 +151,9 @@ describe('Borrow', () => {
 
 describe('Lever', () => {
 
-  test('computeFlashloanDeposit', async () => {
+  test('computeLeveredDeposit', async () => {
     // no existing position
-    expect(computeFlashloanDeposit(
+    expect(computeLeveredDeposit(
       ZERO,
       ZERO,
       WAD,
@@ -167,7 +167,7 @@ describe('Lever', () => {
     // Position: Collateral: 0, Debt: 0, CR: 0
     // Inputs: UnderlierUpFront: 1000, targetCR: 3.0, underlierToCollateralRate: 2.0
     // Outputs: Flashloan: 2000, Collateral: 6000 , Debt: 2000
-    expect(computeFlashloanDeposit(
+    expect(computeLeveredDeposit(
       ZERO,
       ZERO,
       WAD,
@@ -181,7 +181,7 @@ describe('Lever', () => {
     // Position: Collateral: 0, Debt: 0, CR: 0
     // Inputs: UnderlierUpFront: 1000, targetCR: 2.0, underlierToCollateralRate: 0.5
     // Outputs: Flashloan: 333.33, Collateral: 666.66, Debt: 333.33
-    expect(computeFlashloanDeposit(
+    expect(computeLeveredDeposit(
       ZERO,
       ZERO,
       WAD,
@@ -195,7 +195,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 500, CR: 2.0
     // Inputs: UnderlierUpFront: 200, targetCR: 2.0
     // Outputs: Flashloan: 200, Collateral: 1400, Debt: 700
-    expect(computeFlashloanDeposit(
+    expect(computeLeveredDeposit(
       decToWad(1000),
       decToWad(500),
       WAD,
@@ -209,7 +209,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 500, CR: 2.0
     // Inputs: UnderlierUpFront: 0, targetCR: 1.5
     // Outputs: -> Flashloan: 500, Collateral: 1500, Debt: 1000
-    expect(computeFlashloanDeposit(
+    expect(computeLeveredDeposit(
       decToWad(1000),
       decToWad(500),
       WAD,
@@ -223,7 +223,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 500, CR: 2.0
     // Inputs: UnderlierUpFront: 10000, targetCR: 2.0
     // Outputs: -> Flashloan: 10000, Collateral: 21000, Debt: 10500
-    expect(computeFlashloanDeposit(
+    expect(computeLeveredDeposit(
       decToWad(1000),
       decToWad(500),
       WAD,
