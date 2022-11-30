@@ -3,15 +3,14 @@ const ganache = require('ganache');
 
 const { FIAT } = require('../lib/index');
 const {
-  ZERO, WAD, decToWad, wadToDec, decToScale, scaleToDec, scaleToWad, wadToScale, addressEq
+  ZERO, WAD, decToWad, wadToDec, decToScale, scaleToDec, scaleToWad, wadToScale
 } = require('../lib/utils');
 const {
   applySwapSlippage, normalDebtToDebt, debtToNormalDebt,
   computeCollateralizationRatio, computeMaxNormalDebt, computeMinCollateral
 } = require('../lib/borrow');
 const {
-  minCRForLeveredDeposit, maxCRForLeveredDeposit, computeLeveredDeposit, computeLeveredWithdrawal,
-  estimatedUnderlierForLeveredWithdrawal
+  computeLeveredDeposit, computeLeveredWithdrawal, estimatedUnderlierForLeveredWithdrawal
 } = require('../lib/lever');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
@@ -147,7 +146,9 @@ describe('Borrow', () => {
     expect(normalDebt.eq(positionData.normalDebt)).toBe(true);
   });
 
-  test.skip('applySwapSlippage', async () => {});
+  test.only('applySwapSlippage', async () => {
+    expect(applySwapSlippage(WAD, decToWad(0.001)).eq(decToWad(0.999))).toBe(true);
+  });
 });
 
 describe('Lever', () => {
