@@ -31,63 +31,15 @@ import LeverSPTActions from 'changelog/abis/LeverSPTActions.sol/LeverSPTActions.
 import {
   SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUser, queryUserProxies
 } from './queries';
+import { addressEq } from './utils';
 
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 
-export const ZERO = ethers.constants.Zero;
-
-export const WAD = ethers.utils.parseUnits('1', '18');
-
-// decimal: BigNumberish -> BigNumber
-export function decToWad(decimal) {
-  return ethers.utils.parseUnits(String(decimal), '18');
-}
-
-// wad: BigNumberish -> string
-export function wadToDec(wad) {
-  return ethers.utils.formatUnits(wad, '18');
-}
-
-// amount: BigNumberish, toScale: BigNumberish -> BigNumber
-export function decToScale(amount, toScale) {
-  return ethers.utils.parseUnits(String(amount), String(toScale.toString().length - 1));
-}
-
-// amount: BigNumberish, fromScale: BigNumberish -> string
-export function scaleToDec(amount, fromScale) {
-  return ethers.utils.formatUnits(amount, String(fromScale.toString().length - 1));
-}
-
-// amount: BigNumberish, fromScale: BigNumberish -> BigNumber
-export function scaleToWad(amount, fromScale) {
-  if (ethers.BigNumber.from(fromScale.toString()).isZero()) return ZERO;
-  return ethers.BigNumber.from(amount.toString()).mul(WAD).div(fromScale.toString());
-}
-
-// amount: BigNumberish, fromScale: BigNumberish -> BigNumber
-export function wadToScale(wad, toScale) {
-  return ethers.BigNumber.from(wad.toString()).mul(toScale.toString()).div(WAD);
-}
-
-export function toBytes32(str) {
-  return ethers.utils.formatBytes32String(str);
-}
-
-export function encode4Byte(contract, method) {
-  return ethers.utils.defaultAbiCoder.encode(['bytes4'], [contract.interface.getSighash(method)]);
-}
-
-export function addressEq(addressA, addressB) {
-  return ethers.utils.getAddress(addressA) === ethers.utils.getAddress(addressB);
-}
-
-// const convertToHumanReadableValue = (value: BigNumber, scale: number): string => {
-//   const parts = ethers.utils.commify(scaleToDec(value, scale)).toString().split('.')
-//   return parts[0] + '.' + parts[1].slice(0,2)
-// }
-
 export * from './queries';
+export * from './utils';
+export * from './borrow';
+export * from './lever';
 
 // all number values are generally expected as ethers.BigNumber unless they come from the subgraph directly
 export class FIAT {
@@ -468,40 +420,5 @@ export class FIAT {
         normalDebt: ethers.BigNumber.from(position.normalDebt)
       }))
     }));
-  }
-
-  // collateral in WAD 
-  computeCollateralizationRatio(collateral, fairPrice, normalDebt, rate) {
-    if (collateral.isZero()) return ethers.BigNumber.from(0);
-    const debt = this.normalDebtToDebt(normalDebt, rate);
-    if (debt.isZero()) return ethers.BigNumber.from(ethers.constants.MaxUint256);
-    return collateral.mul(fairPrice).div(debt);
-  }
-
-  // collateral in WAD 
-  computeMaxNormalDebt(collateral, rate, fairPrice, collateralizationRatio) {
-    if (collateralizationRatio.isZero()) throw new Error('Invalid value for `collateralizationRatio` - expected non-zero value');
-    if (rate.isZero()) throw new Error('Invalid value for `rate` - expected non-zero value');
-    return this.debtToNormalDebt(collateral.mul(fairPrice).div(collateralizationRatio), rate);
-  }
-
-  computeMinCollateral(normalDebt, rate, fairPrice, collateralizationRatio) {
-    if (fairPrice.isZero()) throw new Error('Invalid value for `fairPrice` - expected non-zero value');
-    const debt = this.normalDebtToDebt(normalDebt, rate);
-    return collateralizationRatio.mul(debt).div(fairPrice);
-  }
-
-  normalDebtToDebt(normalDebt, rate) {
-    return normalDebt.mul(rate).div(WAD);
-  }
-
-  debtToNormalDebt(debt, rate) {
-    if (rate.isZero()) throw new Error('Invalid value for `rate` - expected non-zero value');
-    let normalDebt = debt.mul(WAD).div(rate);
-    // avoid potential rounding error when converting back to debt from normalDebt
-    if (normalDebt.mul(rate).div(WAD).lt(debt)) {
-      normalDebt = normalDebt.add(1);
-    }
-    return normalDebt;
   }
 }

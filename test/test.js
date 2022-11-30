@@ -1,7 +1,17 @@
 const ethers = require('ethers');
 const ganache = require('ganache');
 
-const { FIAT, ZERO, WAD, decToWad, wadToDec, decToScale, scaleToDec, scaleToWad, wadToScale } = require('../lib/index');
+const { FIAT } = require('../lib/index');
+const {
+  ZERO, WAD, decToWad, wadToDec, decToScale, scaleToDec, scaleToWad, wadToScale
+} = require('../lib/utils');
+const {
+  applySwapSlippage, normalDebtToDebt, debtToNormalDebt,
+  computeCollateralizationRatio, computeMaxNormalDebt, computeMinCollateral
+} = require('../lib/borrow');
+const {
+  computeLeveredDeposit, computeLeveredWithdrawal, estimatedUnderlierForLeveredWithdrawal
+} = require('../lib/lever');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
   queryPosition, queryPositions, queryTransaction, queryTransactions,
@@ -70,6 +80,279 @@ describe('Utils', () => {
 });
 
 // Tests run on mainnet state at block height 15711690
+describe('Borrow', () => {
+
+  const defaultAccount = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'; // WETH contract
+  const proxyOwner = '0xCE91783D36925bCc121D0C63376A248a2851982A'; // owner of `proxy`
+  
+  let server;
+
+  let fiat;
+  let collateralTypeData;
+  let positionData;
+  let collateralizationRatio;
+
+  beforeAll(async () => {
+    const options = {
+      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 15957377 },
+      miner: { defaultGasPrice: 30000000000 },
+      wallet: { unlockedAccounts: [defaultAccount, proxyOwner] },
+      logging: { quiet: true }
+    };
+    server = ganache.server(options);
+    await server.listen(8545);
+    fiat = await FIAT.fromSigner(await (new ethers.providers.Web3Provider(server.provider)).getSigner());
+
+    collateralTypeData = (await fiat.fetchCollateralTypesAndPrices(
+      [{ vault: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase(), tokenId: 0 }]
+    ))[0];
+    const userData = await fiat.fetchUserData('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
+    positionData = { collateral: userData[0].positions[0].collateral, normalDebt: userData[0].positions[0].normalDebt };
+  });
+
+  afterAll(async () => {
+    await server.close();
+  });
+
+  test('computeCollateralizationRatio', async () => {
+    collateralizationRatio = computeCollateralizationRatio(
+      positionData.collateral, collateralTypeData.state.collybus.fairPrice, positionData.normalDebt, collateralTypeData.state.codex.rate
+    );
+    expect(wadToDec(collateralizationRatio) > 1.0).toBe(true);
+  });
+
+  test('computeMaxNormalDebt', async () => {
+    const normalDebt = computeMaxNormalDebt(
+      positionData.collateral, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.fairPrice, collateralizationRatio
+    );
+    expect(normalDebt.div(1e8).eq(positionData.normalDebt.div(1e8))).toBe(true);
+  });
+
+  test('computeMinCollateral', async () => {
+    const collateral = computeMinCollateral(
+      positionData.normalDebt, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.fairPrice, collateralizationRatio
+    );
+    expect(collateral.div(1e8).eq(positionData.collateral.div(1e8))).toBe(true);
+  });
+
+  test('normalDebtToDebt', async () => {
+    const debt = normalDebtToDebt(positionData.normalDebt, collateralTypeData.state.codex.rate);
+    expect(debt.gt(positionData.normalDebt)).toBe(true);
+  });
+
+  test('debtToNormalDebt', async () => {
+    const debt = normalDebtToDebt(positionData.normalDebt, collateralTypeData.state.codex.rate);
+    const normalDebt = debtToNormalDebt(debt, collateralTypeData.state.codex.rate);
+    expect(normalDebt.eq(positionData.normalDebt)).toBe(true);
+  });
+
+  test.only('applySwapSlippage', async () => {
+    expect(applySwapSlippage(WAD, decToWad(0.001)).eq(decToWad(0.999))).toBe(true);
+  });
+});
+
+describe('Lever', () => {
+
+  test('computeLeveredDeposit', async () => {
+    // no existing position
+    expect(computeLeveredDeposit(
+      ZERO,
+      ZERO,
+      WAD,
+      WAD,
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(2.0)
+    ).eq(decToWad(1000))).toBe(true);
+
+    // Position: Collateral: 0, Debt: 0, CR: 0
+    // Inputs: UnderlierUpFront: 1000, targetCR: 3.0, underlierToCollateralRate: 2.0
+    // Outputs: Flashloan: 2000, Collateral: 6000 , Debt: 2000
+    expect(computeLeveredDeposit(
+      ZERO,
+      ZERO,
+      WAD,
+      WAD,
+      WAD,
+      decToWad(2.0),
+      decToWad(1000),
+      decToWad(3.0)
+    ).eq(decToWad(2000))).toBe(true);
+
+    // Position: Collateral: 0, Debt: 0, CR: 0
+    // Inputs: UnderlierUpFront: 1000, targetCR: 2.0, underlierToCollateralRate: 0.5
+    // Outputs: Flashloan: 333.33, Collateral: 666.66, Debt: 333.33
+    expect(computeLeveredDeposit(
+      ZERO,
+      ZERO,
+      WAD,
+      WAD,
+      WAD,
+      decToWad(0.5),
+      decToWad(1000),
+      decToWad(2.0)
+    ).eq(decToWad(1000).div(3))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 500, CR: 2.0
+    // Inputs: UnderlierUpFront: 200, targetCR: 2.0
+    // Outputs: Flashloan: 200, Collateral: 1400, Debt: 700
+    expect(computeLeveredDeposit(
+      decToWad(1000),
+      decToWad(500),
+      WAD,
+      WAD,
+      WAD,
+      WAD,
+      decToWad(200),
+      decToWad(2.0)
+    ).eq(decToWad(200))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 500, CR: 2.0
+    // Inputs: UnderlierUpFront: 0, targetCR: 1.5
+    // Outputs: -> Flashloan: 500, Collateral: 1500, Debt: 1000
+    expect(computeLeveredDeposit(
+      decToWad(1000),
+      decToWad(500),
+      WAD,
+      WAD,
+      WAD,
+      WAD,
+      decToWad(0),
+      decToWad(1.5)
+    ).eq(decToWad(500))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 500, CR: 2.0
+    // Inputs: UnderlierUpFront: 10000, targetCR: 2.0
+    // Outputs: -> Flashloan: 10000, Collateral: 21000, Debt: 10500
+    expect(computeLeveredDeposit(
+      decToWad(1000),
+      decToWad(500),
+      WAD,
+      WAD,
+      WAD,
+      WAD,
+      decToWad(10000),
+      decToWad(2.0)
+    ).eq(decToWad(10000))).toBe(true);
+  });
+
+  test('computeLeveredWithdrawal', async () => {
+    // no existing position
+    expect(() => computeLeveredWithdrawal(
+      ZERO,
+      ZERO,
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    )).toThrow();
+
+    // Position: Collateral: 1000, Debt: 0, CR: type(uint256).max
+    // Inputs: CollateralToWithdraw: 10000, targetCR: type(uint256).max
+    // Outputs: -> Flashloan: 0, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      ZERO,
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    ).eq(ZERO)).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 500, CR: 2.0
+    // Inputs: CollateralToWithdraw: 10000, targetCR: type(uint256).max
+    // Outputs: -> Flashloan: 500, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(500),
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    ).eq(decToWad(500))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 1000, CR: 1.0
+    // Inputs: CollateralToWithdraw: 1000, targetCR: type(uint256).max
+    // Outputs: -> Flashloan: 1000, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(1000),
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    ).eq(decToWad(1000))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 1000, CR: 2.0
+    // Inputs: CollateralToWithdraw: 1000, targetCR: type(uint256).max
+    // Outputs: -> Flashloan: 1000, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(1000),
+      WAD,
+      decToWad(2.0),
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    ).eq(decToWad(1000))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 1000, CR: 1.0
+    // Inputs: CollateralToWithdraw: 500, targetCR: 2.0
+    // Outputs: -> Flashloan: 750, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(1000),
+      WAD,
+      WAD,
+      decToWad(500),
+      decToWad(2.0)
+    ).eq(decToWad(750))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 1000, CR: 2.0
+    // Inputs: CollateralToWithdraw: 500, targetCR: 2.0
+    // Outputs: -> Flashloan: 500, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(1000),
+      WAD,
+      decToWad(2.0),
+      decToWad(500),
+      decToWad(2.0)
+    ).eq(decToWad(500))).toBe(true);
+  });
+
+  test('estimatedUnderlierForLeveredWithdrawal', async () => {
+    expect(() => estimatedUnderlierForLeveredWithdrawal(
+      ZERO,
+      WAD,
+      WAD,
+      decToWad(1000)
+    ).toThrow());
+
+    expect(estimatedUnderlierForLeveredWithdrawal(
+      decToWad(1000),
+      WAD,
+      WAD,
+      ZERO
+    ).eq(decToWad(1000))).toBe(true);
+
+    expect(estimatedUnderlierForLeveredWithdrawal(
+      decToWad(1000),
+      WAD,
+      WAD,
+      decToWad(500)
+    ).eq(decToWad(500))).toBe(true);
+
+    expect(estimatedUnderlierForLeveredWithdrawal(
+      decToWad(1000),
+      WAD,
+      WAD,
+      decToWad(1000)
+    ).eq(ZERO)).toBe(true);
+  });
+});
+
+// Tests run on mainnet state at block height 15711690
 describe('FIAT', () => {
 
   const defaultAccount = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'; // WETH contract
@@ -83,7 +366,6 @@ describe('FIAT', () => {
   let contracts;
   let collateralTypeData;
   let positionData;
-  let collateralizationRatio;
   
   beforeAll(async () => {
     const options = {
@@ -334,38 +616,6 @@ describe('FIAT', () => {
     expect(userData3.length === 0).toBe(true);
     const userData4 = await fiat.fetchUserData('0xF1A7dA08F6cb83069817d2D8F6e55E4F2D6C0834');
     expect(userData4[0].isProxy).toBe(true);
-  });
-  
-  test('computeCollateralizationRatio', async () => {
-    collateralizationRatio = fiat.computeCollateralizationRatio(
-      positionData.collateral, collateralTypeData.state.collybus.fairPrice, positionData.normalDebt, collateralTypeData.state.codex.rate
-    );
-    expect(wadToDec(collateralizationRatio) > 1.0).toBe(true);
-  });
-
-  test('computeMaxNormalDebt', async () => {
-    const normalDebt = fiat.computeMaxNormalDebt(
-      positionData.collateral, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.fairPrice, collateralizationRatio
-    );
-    expect(normalDebt.div(1e8).eq(positionData.normalDebt.div(1e8))).toBe(true);
-  });
-
-  test('computeMinCollateral', async () => {
-    const collateral = fiat.computeMinCollateral(
-      positionData.normalDebt, collateralTypeData.state.codex.rate, collateralTypeData.state.collybus.fairPrice, collateralizationRatio
-    );
-    expect(collateral.div(1e8).eq(positionData.collateral.div(1e8))).toBe(true);
-  });
-
-  test('normalDebtToDebt', async () => {
-    const debt = fiat.normalDebtToDebt(positionData.normalDebt, collateralTypeData.state.codex.rate);
-    expect(debt.gt(positionData.normalDebt)).toBe(true);
-  });
-
-  test('debtToNormalDebt', async () => {
-    const debt = fiat.normalDebtToDebt(positionData.normalDebt, collateralTypeData.state.codex.rate);
-    const normalDebt = fiat.debtToNormalDebt(debt, collateralTypeData.state.codex.rate);
-    expect(normalDebt.eq(positionData.normalDebt)).toBe(true);
   });
 
   test('queryVault', async () => {
