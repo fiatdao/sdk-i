@@ -1,13 +1,17 @@
 import { ethers } from 'ethers';
 
-import { WAD } from './utils';
+import { ZERO, WAD } from './utils';
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+// *                                            Levered Deposit                                                *
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 /**
  * Computes the min. possible collateralization ratio for a levered deposit
  * @param fairPrice Fair price of collateral [WAD]
  * @param fiatToUnderlierRate Exchange rate from FIAT to Underlier token [WAD]
  * @param underlierToCollateralRate Exchange rate from Underlier to Collateral token [WAD]
- * @return min. collateralization ratio [wad]
+ * @return min. collateralization ratio [WAD]
  **/ 
 export function minCRForLeveredDeposit(fairPrice, fiatToUnderlierRate, underlierToCollateralRate) {
   return fairPrice.mul(fiatToUnderlierRate).div(WAD).mul(underlierToCollateralRate).div(WAD);  
@@ -21,7 +25,7 @@ export function minCRForLeveredDeposit(fairPrice, fiatToUnderlierRate, underlier
  * @param fairPrice Fair price of collateral [WAD]
  * @param underlierToCollateralRate Exchange rate from Underlier to Collateral token [WAD]
  * @param underlierUpfront Upfront amount of Underlier [WAD]
- * @return max. collateralization ratio [wad]
+ * @return max. collateralization ratio [WAD]
  **/ 
 export function maxCRForLeveredDeposit(
   collateral, normalDebt, rate, fairPrice, underlierToCollateralRate, underlierUpfront
@@ -45,7 +49,7 @@ export function maxCRForLeveredDeposit(
  * @param underlierToCollateralRate Exchange rate from Underlier to Collateral token [WAD]
  * @param underlierUpfront Upfront amount of Underlier [WAD]
  * @param targetCollateralizationRatio Targeted collateralization ratio [WAD]
- * @return flashloan amount [wad]
+ * @return flashloan amount [WAD]
  **/ 
 export function computeLeveredDeposit(
   collateral,
@@ -81,52 +85,82 @@ export function computeLeveredDeposit(
   );
 }
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+// *                                   Levered Withdrawal / Redemption                                         *
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+/**
+ * Computes the min. possible collateralization ratio for a levered withdrawal
+ * @param collateral Current collateral in position [WAD]
+ * @param normalDebt Current normalDebt in position [WAD]
+ * @param fairPrice Fair price of collateral [WAD]
+ * @param rate Current (virtual) normalDebt to debt rate [WAD]
+ * @param collateralToWithdraw Collateral to withdraw (`collateral` has to be greater or equal) [WAD]
+ * @return min. collateralization ratio [WAD]
+ **/ 
+ export function minCRForLeveredWithdrawal(collateral, normalDebt, fairPrice, rate, collateralToWithdraw) {
+  const debt = normalDebt.mul(rate).div(WAD);
+  return debt.isZero()
+    ? ethers.constants.MaxUint256
+    : (fairPrice.mul(collateral.sub(collateralToWithdraw)).div(debt));
+}
+
+/**
+ * Computes the estimated withdrawable underlier amount for a levered withdrawal
+ * @param collateralToWithdraw Collateral to withdraw [WAD]
+ * @param underlierToCollateralRate Exchange rate from Underlier to Collateral token [WAD]
+ * @param fiatToUnderlierRate Exchange rate from FIAT to Underlier token [WAD]
+ * @param flashloan Flashloan amount (see computeLeveredWithdrawal) [WAD]
+ * @return withdrawalable underlier [WAD]
+ */
+export function estimatedUnderlierForLeveredWithdrawal(
+  collateralToWithdraw, underlierToCollateralRate, fiatToUnderlierRate, flashloan
+) {
+  if (underlierToCollateralRate.isZero())
+    throw new Error('Invalid value for `underlierToCollateralRate` - expect non-zero value');
+
+  const underlier = (
+    (collateralToWithdraw.sub(underlierToCollateralRate.mul(fiatToUnderlierRate).div(WAD).mul(flashloan).div(WAD)))
+    .mul(WAD).div(underlierToCollateralRate)
+  );
+  if (underlier.lt(ZERO)) throw new Error('Negative withdrawable underlier amount');
+  return underlier;
+}
+
 /**
  * Computes the flashloan amount (or deltaNormalDebt) for a levered withdrawal
  * @param collateral Current collateral in position [WAD]
  * @param debt Current debt in position [WAD]
  * @param fairPrice Fair price of collateral [WAD]
  * @param rate Current (virtual) normalDebt to debt rate [WAD]
- * @param fiatToUnderlierRate Exchange rate from FIAT to Underlier token [WAD]
- * @param underlierToCollateralRate Exchange rate from Underlier to Collateral token [WAD]
- * @param underlierUpfront Upfront amount of Underlier [WAD]
+ * @param collateralToWithdraw Collateral to withdraw (`collateral` has to be greater or equal) [WAD]
  * @param targetCollateralizationRatio Targeted collateralization ratio [WAD]
- * @return flashloan amount
+ * @return flashloan amount [WAD]
  **/ 
  export function computeLeveredWithdrawal(
   collateral,
   normalDebt,
   rate,
   fairPrice,
-  fiatToUnderlierRate,
-  underlierToCollateralRate,
-  underlierUpfront,
+  collateralToWithdraw,
   targetCollateralizationRatio
 ) {
-  return 0;
-}
+  if (collateralToWithdraw.gt(collateral))
+    throw new Error('Invalid value for `collateral` - expected collateral >= collateralToWithdraw');
 
-/**
- * Computes the flashloan amount (or deltaNormalDebt) for a levered redemption
- * @param collateral Current collateral in position [WAD]
- * @param debt Current debt in position [WAD]
- * @param fairPrice Fair price of collateral [WAD]
- * @param rate Current (virtual) normalDebt to debt rate [WAD]
- * @param fiatToUnderlierRate Exchange rate from FIAT to Underlier token [WAD]
- * @param underlierToCollateralRate Exchange rate from Underlier to Collateral token [WAD]
- * @param underlierUpfront Upfront amount of Underlier [WAD]
- * @param targetCollateralizationRatio Targeted collateralization ratio [WAD]
- * @return flashloan amount
- **/ 
- export function computeLeveredRedemption(
-  collateral,
-  normalDebt,
-  rate,
-  fairPrice,
-  fiatToUnderlierRate,
-  underlierToCollateralRate,
-  underlierUpfront,
-  targetCollateralizationRatio
-) {
-  return 0;
+  const debt = normalDebt.mul(rate).div(WAD);
+  const minCollateralizationRatio = minCRForLeveredWithdrawal(
+    collateral, normalDebt, fairPrice, rate, collateralToWithdraw
+  );
+
+  if (!(minCollateralizationRatio.lte(targetCollateralizationRatio))) {
+    throw new Error('Invalid value for `targetCollateralizationRatio`');
+  }
+
+  const flashloan = debt.sub(
+    (fairPrice.mul(collateral.sub(collateralToWithdraw)).div(WAD))
+    .mul(WAD).div(targetCollateralizationRatio)
+  );
+  if (flashloan.lt(ZERO)) throw new Error('Negative flashloan amount');
+  return flashloan;
 }

@@ -10,7 +10,8 @@ const {
   computeCollateralizationRatio, computeMaxNormalDebt, computeMinCollateral
 } = require('../lib/borrow');
 const {
-  minCRForLeveredDeposit, maxCRForLeveredDeposit, computeLeveredDeposit
+  minCRForLeveredDeposit, maxCRForLeveredDeposit, computeLeveredDeposit, computeLeveredWithdrawal,
+  estimatedUnderlierForLeveredWithdrawal
 } = require('../lib/lever');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
@@ -233,6 +234,120 @@ describe('Lever', () => {
       decToWad(10000),
       decToWad(2.0)
     ).eq(decToWad(10000))).toBe(true);
+  });
+
+  test('computeLeveredWithdrawal', async () => {
+    // no existing position
+    expect(() => computeLeveredWithdrawal(
+      ZERO,
+      ZERO,
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    )).toThrow();
+
+    // Position: Collateral: 1000, Debt: 0, CR: type(uint256).max
+    // Inputs: CollateralToWithdraw: 10000, targetCR: type(uint256).max
+    // Outputs: -> Flashloan: 0, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      ZERO,
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    ).eq(ZERO)).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 500, CR: 2.0
+    // Inputs: CollateralToWithdraw: 10000, targetCR: type(uint256).max
+    // Outputs: -> Flashloan: 500, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(500),
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    ).eq(decToWad(500))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 1000, CR: 1.0
+    // Inputs: CollateralToWithdraw: 1000, targetCR: type(uint256).max
+    // Outputs: -> Flashloan: 1000, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(1000),
+      WAD,
+      WAD,
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    ).eq(decToWad(1000))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 1000, CR: 2.0
+    // Inputs: CollateralToWithdraw: 1000, targetCR: type(uint256).max
+    // Outputs: -> Flashloan: 1000, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(1000),
+      WAD,
+      decToWad(2.0),
+      decToWad(1000),
+      decToWad(ethers.constants.MaxUint256)
+    ).eq(decToWad(1000))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 1000, CR: 1.0
+    // Inputs: CollateralToWithdraw: 500, targetCR: 2.0
+    // Outputs: -> Flashloan: 750, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(1000),
+      WAD,
+      WAD,
+      decToWad(500),
+      decToWad(2.0)
+    ).eq(decToWad(750))).toBe(true);
+
+    // Position: Collateral: 1000, Debt: 1000, CR: 2.0
+    // Inputs: CollateralToWithdraw: 500, targetCR: 2.0
+    // Outputs: -> Flashloan: 500, Collateral: 0, Debt: 0
+    expect(computeLeveredWithdrawal(
+      decToWad(1000),
+      decToWad(1000),
+      WAD,
+      decToWad(2.0),
+      decToWad(500),
+      decToWad(2.0)
+    ).eq(decToWad(500))).toBe(true);
+  });
+
+  test('estimatedUnderlierForLeveredWithdrawal', async () => {
+    expect(() => estimatedUnderlierForLeveredWithdrawal(
+      ZERO,
+      WAD,
+      WAD,
+      decToWad(1000)
+    ).toThrow());
+
+    expect(estimatedUnderlierForLeveredWithdrawal(
+      decToWad(1000),
+      WAD,
+      WAD,
+      ZERO
+    ).eq(decToWad(1000))).toBe(true);
+
+    expect(estimatedUnderlierForLeveredWithdrawal(
+      decToWad(1000),
+      WAD,
+      WAD,
+      decToWad(500)
+    ).eq(decToWad(500))).toBe(true);
+
+    expect(estimatedUnderlierForLeveredWithdrawal(
+      decToWad(1000),
+      WAD,
+      WAD,
+      decToWad(1000)
+    ).eq(ZERO)).toBe(true);
   });
 });
 
