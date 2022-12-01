@@ -1,4 +1,5 @@
 import { WAD } from './utils';
+import { constants, BigNumber } from 'ethers';
 
 /**
  * Deducts slippage from an exchange rate
@@ -45,9 +46,9 @@ export function debtToNormalDebt(debt, rate) {
  * @return collateralization ratio [wad]
  */
 export function computeCollateralizationRatio(collateral, fairPrice, normalDebt, rate) {
-  if (collateral.isZero()) return ethers.BigNumber.from(0);
+  if (collateral.isZero()) return BigNumber.from(0);
   const debt = normalDebtToDebt(normalDebt, rate);
-  if (debt.isZero()) return ethers.BigNumber.from(ethers.constants.MaxUint256);
+  if (debt.isZero()) return BigNumber.from(constants.MaxUint256);
   return collateral.mul(fairPrice).div(debt);
 }
 
