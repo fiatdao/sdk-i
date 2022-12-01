@@ -1,4 +1,5 @@
 import { WAD } from './utils';
+import { ethers } from 'ethers';
 
 /**
  * Deducts slippage from an exchange rate

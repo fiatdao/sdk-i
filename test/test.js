@@ -146,7 +146,7 @@ describe('Borrow', () => {
     expect(normalDebt.eq(positionData.normalDebt)).toBe(true);
   });
 
-  test.only('applySwapSlippage', async () => {
+  test('applySwapSlippage', async () => {
     expect(applySwapSlippage(WAD, decToWad(0.001)).eq(decToWad(0.999))).toBe(true);
   });
 });
