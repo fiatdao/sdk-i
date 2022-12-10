@@ -141,7 +141,7 @@ export class FIAT {
   }
 
   async call(contract, method, ...args) {
-    return await contract[method](...args);
+    return await contract.callStatic[method](...args);
   }
 
   async multicall(calls) {
