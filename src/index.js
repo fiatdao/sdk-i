@@ -176,6 +176,17 @@ export class FIAT {
     );
   }
 
+  async encodeViaProxy(proxyAddress, targetContract, method, ...args) {
+    const { contract, txRequest, txOpts } = this.#buildTx(targetContract, ...args);
+    return this.encode(
+      this.getProxyContract(proxyAddress),
+      'execute',
+      contract.address,
+      contract.interface.encodeFunctionData(method, [...txRequest]),
+      txOpts
+    );
+  }
+
   async send(contract, method, ...args) {
     const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
     const gas = await _contract.estimateGas[method](...txRequest, txOpts);

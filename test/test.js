@@ -460,6 +460,17 @@ describe('FIAT', () => {
     );
   });
 
+  // Ganache returns stale data 
+  test.skip('encodeViaProxy', async () => {
+    console.log(await fiat.encodeViaProxy(
+      proxy,
+      contracts.publican,
+      'collect',
+      ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+      { from: proxyOwner }
+    ));
+  });
+
   test('send', async () => {
     await fiat.send(
       contracts.publican,
