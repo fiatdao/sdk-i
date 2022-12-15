@@ -26,6 +26,7 @@ import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.jso
 import VaultFYActions from 'changelog/abis/VaultFYActions.sol/VaultFYActions.json';
 import VaultSPTActions from 'changelog/abis/VaultSPTActions.sol/VaultSPTActions.json';
 import LeverEPTActions from 'changelog/abis/LeverEPTActions.sol/LeverEPTActions.json';
+import LeverFYActions from 'changelog/abis/LeverFYActions.sol/LeverFYActions.json';
 import LeverSPTActions from 'changelog/abis/LeverSPTActions.sol/LeverSPTActions.json';
 
 import {
@@ -118,6 +119,8 @@ export class FIAT {
       contracts['vaultSPTActions'] = this.#getContract(VaultSPTActions, this.addresses['vaultSPTActions'].address);
     if (this.addresses['leverEPTActions'])
       contracts['leverEPTActions'] = this.#getContract(LeverEPTActions, this.addresses['leverEPTActions'].address);
+    if (this.addresses['leverFYActions'])
+      contracts['leverFYActions'] = this.#getContract(LeverFYActions, this.addresses['leverFYActions'].address);
     if (this.addresses['leverSPTActions'])
       contracts['leverSPTActions'] = this.#getContract(LeverSPTActions, this.addresses['leverSPTActions'].address);
 
