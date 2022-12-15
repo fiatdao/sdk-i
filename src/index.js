@@ -20,6 +20,7 @@ import Moneta from 'changelog/abis/Moneta.sol/Moneta.json';
 import NoLossCollateralAuction from 'changelog/abis/NoLossCollateralAuction.sol/NoLossCollateralAuction.json';
 import PRBProxyRegistry from 'changelog/abis/PRBProxyRegistry.sol/PRBProxyRegistry.json';
 import PRBProxy from 'changelog/abis/PRBProxy.sol/PRBProxy.json';
+import PRBProxyFactory from 'changelog/abis/PRBProxyFactory.sol/PRBProxyFactory.json'
 import Publican from 'changelog/abis/Publican.sol/Publican.json';
 import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.json';
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
@@ -106,6 +107,7 @@ export class FIAT {
       flash: this.#getContract(Flash, this.addresses['flash'].address),
       noLossCollateralAuction: this.#getContract(NoLossCollateralAuction, this.addresses['collateralAuction'].address),
       proxyRegistry: this.#getContract(PRBProxyRegistry, this.addresses['proxyRegistry'].address),
+      proxyFactory: this.#getContract(PRBProxyFactory, this.addresses['proxyFactory'].address),
     };
     
     if (this.addresses['vaultEPTActions'])
@@ -431,5 +433,62 @@ export class FIAT {
         normalDebt: ethers.BigNumber.from(position.normalDebt)
       }))
     }));
+  }
+
+  async fetchUserDataProvider(owner) { // owner is assumed as the proxy right now
+    const contracts = this.getContracts();
+    const collateralTypes = Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
+      [ ...collateralTypes_, ...this.metadata[vault].tokenIds.map((tokenId) => ({ vault, tokenId })) ]
+    ), []);
+
+    const tokenAddressMapping = collateralTypes.map(item => {
+      return { contract: this.getVaultContract(item.vault), method: 'token', args: [] }
+    });
+    const tokenAddressResults = await this.multicall(tokenAddressMapping);
+
+    const balancesMapping = collateralTypes.map(item => {
+      return { contract: contracts.codex, method: 'balances', args: [item.vault, item.tokenId, owner] }
+    });
+    const balanceResults = await this.multicall(balancesMapping);
+    const balances = balanceResults.map((item, index) => {
+      return {
+        balance: balanceResults[index],
+        collateralType: {
+          token: tokenAddressResults[index],
+          tokenId: collateralTypes[index].tokenId
+        }
+      }
+    });
+
+    const positionCallMapping = collateralTypes.map(item => {
+      return { contract: contracts.codex, method: 'positions', args: [item.vault, item.tokenId, owner] }
+    });
+    const positionResults = await this.multicall(positionCallMapping);
+    const positions = positionResults.map((item, index) => {
+      return {
+        collateral: item.collateral,
+        normalDebt: item.normalDebt,
+        owner,
+        token: tokenAddressResults[index],
+        tokenId: collateralTypes[index].tokenId,
+        vault: collateralTypes[index].vault,
+      }
+    });
+
+    const [credit, unbackedDebt, isProxy] = await this.multicall([
+      { contract: contracts.codex, method: 'credit', args: [owner] },
+      { contract: contracts.codex, method: 'unbackedDebt', args: [owner] },
+      { contract: contracts.proxyFactory, method: 'isProxy', args: [owner]}
+    ])
+
+    return [{
+      balances,
+      positions,
+      credit,
+      unbackedDebt,
+      isProxy,
+      delegates: [], // todo
+      delegated: [], // todo
+    }]
   }
 }

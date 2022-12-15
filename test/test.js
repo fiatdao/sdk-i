@@ -629,6 +629,11 @@ describe('FIAT', () => {
     expect(userData4[0].isProxy).toBe(true);
   });
 
+  test.only('fetchUserDataProvider', async () => {
+    const userData = await fiat.fetchUserDataProvider("0xF1A7dA08F6cb83069817d2D8F6e55E4F2D6C0834");
+    console.log({userData})
+  });
+
   test('queryVault', async () => {
     const result = await fiat.query(
       queryVault, { id: ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address.toLowerCase() }
