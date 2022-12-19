@@ -245,7 +245,7 @@ describe('Lever', () => {
       WAD,
       WAD,
       decToWad(1000),
-      decToWad(ethers.constants.MaxUint256)
+      ethers.constants.MaxUint256
     )).toThrow();
 
     // Position: Collateral: 1000, Debt: 0, CR: type(uint256).max
@@ -257,7 +257,7 @@ describe('Lever', () => {
       WAD,
       WAD,
       decToWad(1000),
-      decToWad(ethers.constants.MaxUint256)
+      ethers.constants.MaxUint256
     ).eq(ZERO)).toBe(true);
 
     // Position: Collateral: 1000, Debt: 500, CR: 2.0
@@ -269,7 +269,7 @@ describe('Lever', () => {
       WAD,
       WAD,
       decToWad(1000),
-      decToWad(ethers.constants.MaxUint256)
+      ethers.constants.MaxUint256
     ).eq(decToWad(500))).toBe(true);
 
     // Position: Collateral: 1000, Debt: 1000, CR: 1.0
@@ -281,7 +281,7 @@ describe('Lever', () => {
       WAD,
       WAD,
       decToWad(1000),
-      decToWad(ethers.constants.MaxUint256)
+      ethers.constants.MaxUint256
     ).eq(decToWad(1000))).toBe(true);
 
     // Position: Collateral: 1000, Debt: 1000, CR: 2.0
@@ -293,7 +293,7 @@ describe('Lever', () => {
       WAD,
       decToWad(2.0),
       decToWad(1000),
-      decToWad(ethers.constants.MaxUint256)
+      ethers.constants.MaxUint256
     ).eq(decToWad(1000))).toBe(true);
 
     // Position: Collateral: 1000, Debt: 1000, CR: 1.0

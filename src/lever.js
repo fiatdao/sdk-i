@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 
+import { computeMaxNormalDebt, computeCollateralizationRatio, normalDebtToDebt } from './borrow';
 import { ZERO, WAD } from './utils';
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -99,10 +100,34 @@ export function computeLeveredDeposit(
  * @return min. collateralization ratio [WAD]
  **/ 
  export function minCRForLeveredWithdrawal(collateral, normalDebt, fairPrice, rate, collateralToWithdraw) {
+  if (collateral.lt(collateralToWithdraw)) throw new Error('Invalid value for `collateralToWithdraw` - too high');
   const debt = normalDebt.mul(rate).div(WAD);
   return debt.isZero()
     ? ethers.constants.MaxUint256
     : (fairPrice.mul(collateral.sub(collateralToWithdraw)).div(debt));
+}
+
+/**
+ * Computes the max. possible collateralization ratio for a levered withdrawal
+ * @param collateral Current collateral in position [WAD]
+ * @param normalDebt Current normalDebt in position [WAD]
+ * @param fairPrice Fair price of collateral [WAD]
+ * @param rate Current (virtual) normalDebt to debt rate [WAD]
+ * @param collateralToWithdraw Collateral to withdraw (`collateral` has to be greater or equal) [WAD]
+ * @param normalDebtToRepay Normalized debt to repay (`normalDebt` has to be greater or equal) [WAD]
+ * @return max. collateralization ratio [WAD]
+ **/ 
+export function maxCRForLeveredWithdrawal(
+  collateral, normalDebt, fairPrice, rate, collateralToWithdraw, normalDebtToRepay
+) {
+  if (collateral.lt(collateralToWithdraw))
+    throw new Error('Invalid value for `collateralToWithdraw` - expected collateral >= collateralToWithdraw');
+  if (normalDebt.lt(normalDebtToRepay))
+    throw new Error('Invalid value for `normalDebtToRepay` - expected normalDebt >= normalDebtToRepay');
+  if (normalDebt.sub(normalDebtToRepay).isZero()) return ethers.constants.MaxUint256;
+  return computeCollateralizationRatio(
+    collateral.sub(collateralToWithdraw), normalDebt.sub(normalDebtToRepay), fairPrice, rate
+  );
 }
 
 /**
@@ -138,6 +163,42 @@ export function estimatedUnderlierForLeveredWithdrawal(
  * @return flashloan amount [WAD]
  **/ 
  export function computeLeveredWithdrawal(
+  collateral,
+  normalDebt,
+  rate,
+  fairPrice,
+  collateralToWithdraw,
+  targetCollateralizationRatio
+) {
+  if (collateralToWithdraw.gt(collateral))
+    throw new Error('Invalid value for `collateral` - expected collateral >= collateralToWithdraw');
+
+  const minCollateralizationRatio = minCRForLeveredWithdrawal(
+    collateral, normalDebt, fairPrice, rate, collateralToWithdraw
+  );
+
+  if (!(minCollateralizationRatio.lte(targetCollateralizationRatio))) {
+    throw new Error('Invalid value for `targetCollateralizationRatio`');
+  }
+
+  const normalDebtToRepay = (collateral.isZero())
+  ? normalDebt
+  : normalDebt.sub(computeMaxNormalDebt(collateral.sub(collateralToWithdraw), rate, fairPrice, targetCollateralizationRatio));
+
+  const maxCollateralizationRatio = maxCRForLeveredWithdrawal(
+    collateral, normalDebt, fairPrice, rate, collateralToWithdraw, normalDebtToRepay
+  );
+
+  if (!(targetCollateralizationRatio.lte(maxCollateralizationRatio))) {
+    throw new Error('Invalid value for `targetCollateralizationRatio`');
+  }
+
+  const flashloan = normalDebtToDebt(normalDebtToRepay, rate);
+  if (flashloan.lt(ZERO)) throw new Error('Negative flashloan amount');
+  return flashloan;
+}
+
+export function computeLeveredWithdrawal2(
   collateral,
   normalDebt,
   rate,
