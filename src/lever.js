@@ -100,7 +100,8 @@ export function computeLeveredDeposit(
  * @return min. collateralization ratio [WAD]
  **/ 
  export function minCRForLeveredWithdrawal(collateral, normalDebt, fairPrice, rate, collateralToWithdraw) {
-  if (collateral.lt(collateralToWithdraw)) throw new Error('Invalid value for `collateralToWithdraw` - too high');
+  if (collateral.lt(collateralToWithdraw))
+    throw new Error('Invalid value for `collateralToWithdraw` - expected collateral >= collateralToWithdraw');
   const debt = normalDebt.mul(rate).div(WAD);
   return debt.isZero()
     ? ethers.constants.MaxUint256
@@ -183,7 +184,9 @@ export function estimatedUnderlierForLeveredWithdrawal(
 
   const normalDebtToRepay = (collateral.isZero())
   ? normalDebt
-  : normalDebt.sub(computeMaxNormalDebt(collateral.sub(collateralToWithdraw), rate, fairPrice, targetCollateralizationRatio));
+  : normalDebt.sub(
+    computeMaxNormalDebt(collateral.sub(collateralToWithdraw), rate, fairPrice, targetCollateralizationRatio)
+  );
 
   const maxCollateralizationRatio = maxCRForLeveredWithdrawal(
     collateral, normalDebt, fairPrice, rate, collateralToWithdraw, normalDebtToRepay
