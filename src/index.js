@@ -437,6 +437,16 @@ export class FIAT {
 
   async fetchUserDataProvider(owner) { // owner is assumed as the proxy right now
     const contracts = this.getContracts();
+
+    /*
+    // This throws heap out of memory errors or rate limit errors from provider
+    const proxyFilter = await contracts.proxyFactory.filters.DeployProxy(null, null, owner);
+    const proxyEvents = await contracts.proxyFactory.queryFilter(
+      proxyFilter,
+      14554754
+    );
+    */
+
     const collateralTypes = Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
       [ ...collateralTypes_, ...this.metadata[vault].tokenIds.map((tokenId) => ({ vault, tokenId })) ]
     ), []);
@@ -444,51 +454,64 @@ export class FIAT {
     const tokenAddressMapping = collateralTypes.map(item => {
       return { contract: this.getVaultContract(item.vault), method: 'token', args: [] }
     });
-    const tokenAddressResults = await this.multicall(tokenAddressMapping);
+    const tokenAddressPromise = this.multicall(tokenAddressMapping);
 
-    const balancesMapping = collateralTypes.map(item => {
-      return { contract: contracts.codex, method: 'balances', args: [item.vault, item.tokenId, owner] }
-    });
-    const balanceResults = await this.multicall(balancesMapping);
-    const balances = balanceResults.map((item, index) => {
-      return {
-        balance: balanceResults[index],
-        collateralType: {
-          token: tokenAddressResults[index],
-          tokenId: collateralTypes[index].tokenId
+    const proxyPromise = this.multicall([
+      { contract: contracts.proxyFactory, method: 'isProxy', args: [owner]},
+      { contract: contracts.proxyRegistry, method: 'getCurrentProxy', args: [owner]}
+    ]);
+
+    const [ tokenAddressResults, proxyResults ] = await Promise.all([tokenAddressPromise, proxyPromise]);
+    const [isProxy, proxyAddress] = proxyResults;
+
+    const addresses = isProxy || !proxyAddress ? [owner] : [owner, proxyResults[1]]
+    const userData = [];
+
+    for (const address of addresses) {
+      const balancesMapping = collateralTypes.map(item => {
+        return { contract: contracts.codex, method: 'balances', args: [item.vault, item.tokenId, address] }
+      });
+      const balanceResults = await this.multicall(balancesMapping);
+      const balances = balanceResults.map((item, index) => {
+        return {
+          balance: balanceResults[index],
+          collateralType: {
+            token: tokenAddressResults[index],
+            tokenId: collateralTypes[index].tokenId
+          }
         }
-      }
-    });
-
-    const positionCallMapping = collateralTypes.map(item => {
-      return { contract: contracts.codex, method: 'positions', args: [item.vault, item.tokenId, owner] }
-    });
-    const positionResults = await this.multicall(positionCallMapping);
-    const positions = positionResults.map((item, index) => {
-      return {
-        collateral: item.collateral,
-        normalDebt: item.normalDebt,
-        owner,
-        token: tokenAddressResults[index],
-        tokenId: collateralTypes[index].tokenId,
-        vault: collateralTypes[index].vault,
-      }
-    });
-
-    const [credit, unbackedDebt, isProxy] = await this.multicall([
-      { contract: contracts.codex, method: 'credit', args: [owner] },
-      { contract: contracts.codex, method: 'unbackedDebt', args: [owner] },
-      { contract: contracts.proxyFactory, method: 'isProxy', args: [owner]}
-    ])
-
-    return [{
-      balances,
-      positions,
-      credit,
-      unbackedDebt,
-      isProxy,
-      delegates: [], // todo
-      delegated: [], // todo
-    }]
+      });
+  
+      const positionCallMapping = collateralTypes.map(item => {
+        return { contract: contracts.codex, method: 'positions', args: [item.vault, item.tokenId, address] }
+      });
+      const positionResults = await this.multicall(positionCallMapping);
+      const positions = positionResults.map((item, index) => {
+        return {
+          collateral: item.collateral,
+          normalDebt: item.normalDebt,
+          owner: address,
+          token: tokenAddressResults[index],
+          tokenId: collateralTypes[index].tokenId,
+          vault: collateralTypes[index].vault,
+        }
+      });
+  
+      const [credit, unbackedDebt] = await this.multicall([
+        { contract: contracts.codex, method: 'credit', args: [address] },
+        { contract: contracts.codex, method: 'unbackedDebt', args: [address] },
+      ])
+  
+      userData.push({
+        balances,
+        positions,
+        credit,
+        unbackedDebt,
+        isProxy: address === owner && isProxy,
+        delegates: [], // todo
+        delegated: [], // todo
+      })
+    }
+    return userData;
   }
 }
