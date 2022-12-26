@@ -474,25 +474,27 @@ export class FIAT {
 
       const [ balanceResults, positionResults, [credit, unbackedDebt]] = await Promise.all([balanceResultsPromise, positionResultsPromise, creditDebtPromise]);
 
-      const balances = balanceResults.map((item, index) => {
-        return {
+      const balances = balanceResults.reduce((resultArray, item, index) => {
+        if (balanceResults[index].eq(0)) return resultArray;
+        return resultArray.push({
           balance: balanceResults[index],
           collateralType: {
             token: tokenAddressResults[index],
             tokenId: collateralTypes[index].tokenId
           }
-        }
-      });
-      const positions = positionResults.map((item, index) => {
-        return {
+        })
+      }, []);
+      const positions = positionResults.reduce((resultArray, item, index) => {
+        if (item.collateral.eq(0) && item.normalDebt.eq(0)) return resultArray;
+        return resultArray.push({
           collateral: item.collateral,
           normalDebt: item.normalDebt,
           owner: address,
           token: tokenAddressResults[index],
           tokenId: collateralTypes[index].tokenId,
           vault: collateralTypes[index].vault,
-        }
-      });
+        })
+      }, []);
       userData.push({
         balances,
         positions,
@@ -501,7 +503,7 @@ export class FIAT {
         isProxy: (address === owner && isProxy) || (address === proxyAddress),
         delegates: [], // todo
         delegated: [], // todo
-      })
+      });
     }
     return userData;
   }
