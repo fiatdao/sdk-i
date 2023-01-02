@@ -435,7 +435,7 @@ export class FIAT {
     }));
   }
 
-  async fetchUserDataProvider(owner) { // owner is assumed as the proxy right now
+  async fetchUserDataProvider(owner) {
     const contracts = this.getContracts();
     const collateralTypes = Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
       [ ...collateralTypes_, ...this.metadata[vault].tokenIds.map((tokenId) => ({ vault, tokenId })) ]
@@ -479,7 +479,7 @@ export class FIAT {
         return resultArray.push({
           balance: balanceResults[index],
           collateralType: {
-            token: tokenAddressResults[index],
+            token: tokenAddressResults[index].toLowerCase(),
             tokenId: collateralTypes[index].tokenId
           }
         })
@@ -489,16 +489,16 @@ export class FIAT {
         resultArray.push({
           collateral: item.collateral,
           normalDebt: item.normalDebt,
-          owner: address,
-          token: tokenAddressResults[index],
+          owner: address.toLowerCase(),
+          token: tokenAddressResults[index].toLowerCase(),
           tokenId: ethers.BigNumber.from(collateralTypes[index].tokenId),
-          vault: collateralTypes[index].vault,
+          vault: collateralTypes[index].vault.toLowerCase(),
         })
         return resultArray;
       }, []);
       if (balances.length === 0 && positions.length === 0) continue;
       userData.push({
-        user: address,
+        user: address.toLowerCase(),
         balances,
         positions,
         credit,
