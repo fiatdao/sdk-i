@@ -629,9 +629,8 @@ describe('FIAT', () => {
     expect(userData4[0].isProxy).toBe(true);
   });
 
-  test.only('fetchUserDataProvider', async () => {
-    const userData = await fiat.fetchUserDataProvider("0xF1A7dA08F6cb83069817d2D8F6e55E4F2D6C0834");
-    console.log(JSON.stringify(userData, null, 2));
+  test('fetchUserDataProvider', async () => {
+    const userData = await fiat.fetchUserDataProvider(proxyOwner);
   });
 
   test('queryVault', async () => {

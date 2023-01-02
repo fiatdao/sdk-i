@@ -486,23 +486,26 @@ export class FIAT {
       }, []);
       const positions = positionResults.reduce((resultArray, item, index) => {
         if (item.collateral.eq(0) && item.normalDebt.eq(0)) return resultArray;
-        return resultArray.push({
+        resultArray.push({
           collateral: item.collateral,
           normalDebt: item.normalDebt,
           owner: address,
           token: tokenAddressResults[index],
-          tokenId: collateralTypes[index].tokenId,
+          tokenId: ethers.BigNumber.from(collateralTypes[index].tokenId),
           vault: collateralTypes[index].vault,
         })
+        return resultArray;
       }, []);
+      if (balances.length === 0 && positions.length === 0) continue;
       userData.push({
+        user: address,
         balances,
         positions,
         credit,
         unbackedDebt,
         isProxy: (address === owner && isProxy) || (address === proxyAddress),
-        delegates: [], // todo
-        delegated: [], // todo
+        delegates: [],
+        delegated: [],
       });
     }
     return userData;
