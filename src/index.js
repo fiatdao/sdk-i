@@ -455,19 +455,19 @@ export class FIAT {
     const [isProxy, proxyAddress] = proxyResults;
 
     const addresses = isProxy || !proxyAddress ? [owner] : [owner, proxyResults[1]]
-    const userData = [];
 
     // Check balances for owner address + proxies
-    for (const address of addresses) {
+
+    const asyncUserData = async (address) => {
       const balancesMapping = collateralTypes.map(item => {
         return { contract: contracts.codex, method: 'balances', args: [item.vault, item.tokenId, address] }
       });
       const positionCallMapping = collateralTypes.map(item => {
         return { contract: contracts.codex, method: 'positions', args: [item.vault, item.tokenId, address] }
       });
-      const balanceResultsPromise = await this.multicall(balancesMapping);
-      const positionResultsPromise = await this.multicall(positionCallMapping);
-      const creditDebtPromise = await this.multicall([
+      const balanceResultsPromise = this.multicall(balancesMapping);
+      const positionResultsPromise = this.multicall(positionCallMapping);
+      const creditDebtPromise = this.multicall([
         { contract: contracts.codex, method: 'credit', args: [address] },
         { contract: contracts.codex, method: 'unbackedDebt', args: [address] },
       ]);
@@ -496,8 +496,8 @@ export class FIAT {
         })
         return resultArray;
       }, []);
-      if (balances.length === 0 && positions.length === 0) continue;
-      userData.push({
+
+      return {
         user: address.toLowerCase(),
         balances,
         positions,
@@ -506,8 +506,14 @@ export class FIAT {
         isProxy: (address === owner && isProxy) || (address === proxyAddress),
         delegates: [],
         delegated: [],
-      });
+      }
     }
-    return userData;
+    
+    const userDataPromises = [];
+    for (const address of addresses) {
+      userDataPromises.push(asyncUserData(address));
+    }
+    const userDataResults = await Promise.all(userDataPromises);
+    return userDataResults.filter((item) => item.balances.length > 0 || item.positions.length > 0);
   }
 }
