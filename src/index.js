@@ -435,66 +435,57 @@ export class FIAT {
     }));
   }
 
-  async fetchUserDataProvider(owner) {
+  async fetchUserDataViaProvider(owner) {
     const contracts = this.getContracts();
     const collateralTypes = Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
       [ ...collateralTypes_, ...this.metadata[vault].tokenIds.map((tokenId) => ({ vault, tokenId })) ]
     ), []);
 
-    const tokenAddressMapping = collateralTypes.map(item => {
-      return { contract: this.getVaultContract(item.vault), method: 'token', args: [] }
-    });
-    const tokenAddressPromise = this.multicall(tokenAddressMapping);
-
-    const proxyQueryPromise = this.multicall([
-      { contract: contracts.proxyFactory, method: 'isProxy', args: [owner]},
-      { contract: contracts.proxyRegistry, method: 'getCurrentProxy', args: [owner]}
+    const [tokens, [isProxy, proxyAddress]] = await Promise.all([
+      this.multicall(collateralTypes.map(item => ({
+        contract: this.getVaultContract(item.vault), method: 'token', args: []
+      }))),
+      this.multicall([
+        { contract: contracts.proxyFactory, method: 'isProxy', args: [owner]},
+        { contract: contracts.proxyRegistry, method: 'getCurrentProxy', args: [owner]}
+      ])
     ]);
 
-    const [ tokenAddressResults, proxyResults ] = await Promise.all([tokenAddressPromise, proxyQueryPromise]);
-    const [isProxy, proxyAddress] = proxyResults;
-
-    const addresses = isProxy || !proxyAddress ? [owner] : [owner, proxyResults[1]]
+    const addresses = (isProxy || !proxyAddress) ? [owner] : [owner, proxyAddress]
 
     // Check balances for owner address + proxies
-
     const asyncUserData = async (address) => {
-      const balancesMapping = collateralTypes.map(item => {
-        return { contract: contracts.codex, method: 'balances', args: [item.vault, item.tokenId, address] }
-      });
-      const positionCallMapping = collateralTypes.map(item => {
-        return { contract: contracts.codex, method: 'positions', args: [item.vault, item.tokenId, address] }
-      });
-      const balanceResultsPromise = this.multicall(balancesMapping);
-      const positionResultsPromise = this.multicall(positionCallMapping);
-      const creditDebtPromise = this.multicall([
-        { contract: contracts.codex, method: 'credit', args: [address] },
-        { contract: contracts.codex, method: 'unbackedDebt', args: [address] },
+      const [balanceResults, positionResults, [credit, unbackedDebt]] = await Promise.all([
+        this.multicall(collateralTypes.map(item => {
+          return { contract: contracts.codex, method: 'balances', args: [item.vault, item.tokenId, address] }
+        })),
+        this.multicall(collateralTypes.map(item => {
+          return { contract: contracts.codex, method: 'positions', args: [item.vault, item.tokenId, address] }
+        })),
+        this.multicall([
+          { contract: contracts.codex, method: 'credit', args: [address] },
+          { contract: contracts.codex, method: 'unbackedDebt', args: [address] },
+        ])
       ]);
 
-      const [ balanceResults, positionResults, [credit, unbackedDebt]] = await Promise.all([balanceResultsPromise, positionResultsPromise, creditDebtPromise]);
-
-      const balances = balanceResults.reduce((resultArray, item, index) => {
-        if (balanceResults[index].eq(0)) return resultArray;
-        return resultArray.push({
+      const balances = balanceResults.reduce((balances_, item, index) => {
+        if (balanceResults[index].eq(0)) return balances_;
+        return balances_.push({
           balance: balanceResults[index],
-          collateralType: {
-            token: tokenAddressResults[index].toLowerCase(),
-            tokenId: collateralTypes[index].tokenId
-          }
+          collateralType: { token: tokens[index].toLowerCase(), tokenId: collateralTypes[index].tokenId }
         })
       }, []);
-      const positions = positionResults.reduce((resultArray, item, index) => {
-        if (item.collateral.eq(0) && item.normalDebt.eq(0)) return resultArray;
-        resultArray.push({
+      const positions = positionResults.reduce((positions_, item, index) => {
+        if (item.collateral.eq(0) && item.normalDebt.eq(0)) return positions_;
+        positions_.push({
           collateral: item.collateral,
           normalDebt: item.normalDebt,
           owner: address.toLowerCase(),
-          token: tokenAddressResults[index].toLowerCase(),
+          token: tokens[index].toLowerCase(),
           tokenId: ethers.BigNumber.from(collateralTypes[index].tokenId),
           vault: collateralTypes[index].vault.toLowerCase(),
         })
-        return resultArray;
+        return positions_;
       }, []);
 
       return {
@@ -509,11 +500,7 @@ export class FIAT {
       }
     }
     
-    const userDataPromises = [];
-    for (const address of addresses) {
-      userDataPromises.push(asyncUserData(address));
-    }
-    const userDataResults = await Promise.all(userDataPromises);
-    return userDataResults.filter((item) => item.balances.length > 0 || item.positions.length > 0);
+    return (await Promise.all(addresses.map((address) => asyncUserData(address))))
+      .filter((item) => item.balances.length > 0 || item.positions.length > 0);
   }
 }

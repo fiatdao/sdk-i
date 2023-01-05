@@ -629,8 +629,22 @@ describe('FIAT', () => {
     expect(userData4[0].isProxy).toBe(true);
   });
 
-  test('fetchUserDataProvider', async () => {
-    const userData = await fiat.fetchUserDataProvider(proxyOwner);
+  test.only('fetchUserDataViaProvider', async () => {
+    const userData = await fiat.fetchUserData('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
+    const userDataViaProvider = await fiat.fetchUserDataViaProvider('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
+    expect(userDataViaProvider[0].isProxy).toBe(userData[0].isProxy);
+    expect(userDataViaProvider[0].positions[0].collateral.eq(userData[0].positions[0].collateral)).toBe(true);
+    const userData2 = await fiat.fetchUserData('0xcD6998D20876155D37aEC0dB4C19d63EEAEf058F');
+    const userDataViaProvider2 = await fiat.fetchUserDataViaProvider('0xcD6998D20876155D37aEC0dB4C19d63EEAEf058F');
+    expect(userDataViaProvider2[0].isProxy).toBe(userData2[0].isProxy);
+    const userData3 = await fiat.fetchUserData(defaultAccount);
+    const userDataViaProvider3 = await fiat.fetchUserDataViaProvider(defaultAccount);
+    expect(userDataViaProvider3.length).toBe(userData3.length);
+    const userData4 = await fiat.fetchUserData('0xF1A7dA08F6cb83069817d2D8F6e55E4F2D6C0834');
+    console.log(userData4);
+    const userDataViaProvider4 = await fiat.fetchUserDataViaProvider('0xF1A7dA08F6cb83069817d2D8F6e55E4F2D6C0834');
+    console.log(userDataViaProvider4);
+    expect(userDataViaProvider4[0].isProxy).toBe(userData4[0].isProxy);
   });
 
   test('queryVault', async () => {
