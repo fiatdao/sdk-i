@@ -32,7 +32,7 @@ import LeverSPTActions from 'changelog/abis/LeverSPTActions.sol/LeverSPTActions.
 import {
   SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUser, queryUserProxies
 } from './queries';
-import { addressEq } from './utils';
+import { addressEq, ADDRESS_ZERO } from './utils';
 
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
@@ -451,7 +451,7 @@ export class FIAT {
       ])
     ]);
 
-    const addresses = (isProxy || !proxyAddress) ? [owner] : [owner, proxyAddress]
+    const addresses = (isProxy || proxyAddress === ADDRESS_ZERO) ? [owner] : [owner, proxyAddress];
 
     // Check balances for owner address + proxies
     const asyncUserData = async (address) => {
@@ -501,6 +501,6 @@ export class FIAT {
     }
     
     return (await Promise.all(addresses.map((address) => asyncUserData(address))))
-      .filter((item) => item.balances.length > 0 || item.positions.length > 0);
+      .filter((item) => item.isProxy || item.balances.length > 0 || item.positions.length > 0);
   }
 }

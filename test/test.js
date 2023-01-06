@@ -641,9 +641,7 @@ describe('FIAT', () => {
     const userDataViaProvider3 = await fiat.fetchUserDataViaProvider(defaultAccount);
     expect(userDataViaProvider3.length).toBe(userData3.length);
     const userData4 = await fiat.fetchUserData('0xF1A7dA08F6cb83069817d2D8F6e55E4F2D6C0834');
-    console.log(userData4);
     const userDataViaProvider4 = await fiat.fetchUserDataViaProvider('0xF1A7dA08F6cb83069817d2D8F6e55E4F2D6C0834');
-    console.log(userDataViaProvider4);
     expect(userDataViaProvider4[0].isProxy).toBe(userData4[0].isProxy);
   });
 
