@@ -20,6 +20,7 @@ import Moneta from 'changelog/abis/Moneta.sol/Moneta.json';
 import NoLossCollateralAuction from 'changelog/abis/NoLossCollateralAuction.sol/NoLossCollateralAuction.json';
 import PRBProxyRegistry from 'changelog/abis/PRBProxyRegistry.sol/PRBProxyRegistry.json';
 import PRBProxy from 'changelog/abis/PRBProxy.sol/PRBProxy.json';
+import PRBProxyFactory from 'changelog/abis/PRBProxyFactory.sol/PRBProxyFactory.json'
 import Publican from 'changelog/abis/Publican.sol/Publican.json';
 import VaultEPTActions from 'changelog/abis/VaultEPTActions.sol/VaultEPTActions.json';
 import VaultFCActions from 'changelog/abis/VaultFCActions.sol/VaultFCActions.json';
@@ -32,7 +33,7 @@ import LeverSPTActions from 'changelog/abis/LeverSPTActions.sol/LeverSPTActions.
 import {
   SUBGRAPH_URL_MAINNET, SUBGRAPH_URL_GOERLI, queryCollateralTypes, queryUser, queryUserProxies
 } from './queries';
-import { addressEq } from './utils';
+import { addressEq, ADDRESS_ZERO } from './utils';
 
 // mute 'duplicate event' abi error
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
@@ -107,6 +108,7 @@ export class FIAT {
       flash: this.#getContract(Flash, this.addresses['flash'].address),
       noLossCollateralAuction: this.#getContract(NoLossCollateralAuction, this.addresses['collateralAuction'].address),
       proxyRegistry: this.#getContract(PRBProxyRegistry, this.addresses['proxyRegistry'].address),
+      proxyFactory: this.#getContract(PRBProxyFactory, this.addresses['proxyFactory'].address),
     };
     
     if (this.addresses['vaultEPTActions'])
@@ -434,5 +436,74 @@ export class FIAT {
         normalDebt: ethers.BigNumber.from(position.normalDebt)
       }))
     }));
+  }
+
+  async fetchUserDataViaProvider(owner) {
+    const contracts = this.getContracts();
+    const collateralTypes = Object.keys(this.metadata).reduce((collateralTypes_, vault) => (
+      [ ...collateralTypes_, ...this.metadata[vault].tokenIds.map((tokenId) => ({ vault, tokenId })) ]
+    ), []);
+
+    const [tokens, [isProxy, proxyAddress]] = await Promise.all([
+      this.multicall(collateralTypes.map(item => ({
+        contract: this.getVaultContract(item.vault), method: 'token', args: []
+      }))),
+      this.multicall([
+        { contract: contracts.proxyFactory, method: 'isProxy', args: [owner]},
+        { contract: contracts.proxyRegistry, method: 'getCurrentProxy', args: [owner]}
+      ])
+    ]);
+
+    const addresses = (isProxy || proxyAddress === ADDRESS_ZERO) ? [owner] : [owner, proxyAddress];
+
+    // Check balances for owner address + proxies
+    const asyncUserData = async (address) => {
+      const [balanceResults, positionResults, [credit, unbackedDebt]] = await Promise.all([
+        this.multicall(collateralTypes.map(item => {
+          return { contract: contracts.codex, method: 'balances', args: [item.vault, item.tokenId, address] }
+        })),
+        this.multicall(collateralTypes.map(item => {
+          return { contract: contracts.codex, method: 'positions', args: [item.vault, item.tokenId, address] }
+        })),
+        this.multicall([
+          { contract: contracts.codex, method: 'credit', args: [address] },
+          { contract: contracts.codex, method: 'unbackedDebt', args: [address] },
+        ])
+      ]);
+
+      const balances = balanceResults.reduce((balances_, item, index) => {
+        if (balanceResults[index].eq(0)) return balances_;
+        return balances_.push({
+          balance: balanceResults[index],
+          collateralType: { token: tokens[index].toLowerCase(), tokenId: collateralTypes[index].tokenId }
+        })
+      }, []);
+      const positions = positionResults.reduce((positions_, item, index) => {
+        if (item.collateral.eq(0) && item.normalDebt.eq(0)) return positions_;
+        positions_.push({
+          collateral: item.collateral,
+          normalDebt: item.normalDebt,
+          owner: address.toLowerCase(),
+          token: tokens[index].toLowerCase(),
+          tokenId: ethers.BigNumber.from(collateralTypes[index].tokenId),
+          vault: collateralTypes[index].vault.toLowerCase(),
+        })
+        return positions_;
+      }, []);
+
+      return {
+        user: address.toLowerCase(),
+        balances,
+        positions,
+        credit,
+        unbackedDebt,
+        isProxy: (address === owner && isProxy) || (address === proxyAddress),
+        delegates: [],
+        delegated: [],
+      }
+    }
+    
+    return (await Promise.all(addresses.map((address) => asyncUserData(address))))
+      .filter((item) => item.isProxy || item.balances.length > 0 || item.positions.length > 0);
   }
 }

@@ -3,6 +3,8 @@ import { ethers } from 'ethers';
 export const ZERO = ethers.constants.Zero;
 export const WAD = ethers.utils.parseUnits('1', '18');
 
+export const ADDRESS_ZERO = ethers.constants.AddressZero;
+
 // decimal: BigNumberish -> BigNumber
 export function decToWad(decimal) {
   return ethers.utils.parseUnits(String(decimal), '18');
