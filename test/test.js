@@ -20,7 +20,7 @@ const {
 
 const ADDRESSES_MAINNET = require('changelog/deployment/deployment-mainnet.json');
 
-jest.setTimeout(50000);
+jest.setTimeout(75000);
 
 describe('Utils', () => {
 
@@ -369,7 +369,7 @@ describe('FIAT', () => {
   
   beforeAll(async () => {
     const options = {
-      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 15957377 },
+      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 16370300 },
       miner: { defaultGasPrice: 30000000000 },
       wallet: { unlockedAccounts: [defaultAccount, proxyOwner] },
       logging: { quiet: true }
@@ -629,7 +629,7 @@ describe('FIAT', () => {
     expect(userData4[0].isProxy).toBe(true);
   });
 
-  test.only('fetchUserDataViaProvider', async () => {
+  test('fetchUserDataViaProvider', async () => {
     const userData = await fiat.fetchUserData('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
     const userDataViaProvider = await fiat.fetchUserDataViaProvider('0x9763b704f3fd8d70914d2d1293da4b7c1a38702c');
     expect(userDataViaProvider[0].isProxy).toBe(userData[0].isProxy);

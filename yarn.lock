@@ -1980,7 +1980,7 @@ chalk@^4.0.0:
 
 "changelog@https://github.com/fiatdao/changelog":
   version "0.0.0"
-  resolved "https://github.com/fiatdao/changelog#1d19c9f7ffd2a7f9b2983772f56687689fa05788"
+  resolved "https://github.com/fiatdao/changelog#8623691348dd1be58b059d0e3de0981e0f868c54"
 
 char-regex@^1.0.2:
   version "1.0.2"

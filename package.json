@@ -1,6 +1,6 @@
 {
   "name": "@fiatdao/sdk",
-  "version": "0.0.31",
+  "version": "0.0.32",
   "description": "Javascript library for interacting with the FIAT protocol's contracts",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
