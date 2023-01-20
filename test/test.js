@@ -11,7 +11,8 @@ const {
   computeCollateralizationRatio, computeMaxNormalDebt, computeMinCollateral
 } = require('../lib/borrow');
 const {
-  computeFlashloanForLeveredDeposit, computeFlashloanForLeveredWithdrawal, estimatedUnderlierForLeveredWithdrawal
+  computeFlashloanForLeveredDeposit, computeFlashloanForLeveredWithdrawal, estimatedUnderlierForLeveredWithdrawal,
+  profitAtMaturity, yieldToMaturity, yieldToMaturityToAnnualYield
 } = require('../lib/lever');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
@@ -209,7 +210,7 @@ describe('Borrow', () => {
   });
 });
 
-describe('Lever', () => {
+describe.only('Lever', () => {
 
   test('computeFlashloanForLeveredDeposit', async () => {
     // no existing position
@@ -406,6 +407,50 @@ describe('Lever', () => {
       WAD,
       WAD,
       decToWad(1000)
+    ).eq(ZERO)).toBe(true);
+  });
+
+  test('profitAtMaturity', async () => {
+    expect(profitAtMaturity(
+      WAD,
+      WAD
+    ).eq(ZERO)).toBe(true);
+    expect(profitAtMaturity(
+      WAD,
+      ZERO
+    ).eq(WAD.mul(-1))).toBe(true);
+    expect(profitAtMaturity(
+      ZERO,
+      WAD
+    ).eq(WAD)).toBe(true);
+  });
+
+  test('yieldToMaturity', async () => {
+    expect(yieldToMaturity(
+      WAD,
+      WAD,
+    ).eq(WAD)).toBe(true);
+    expect(yieldToMaturity(
+      WAD,
+      WAD.mul(2),
+    ).eq(WAD.mul(2))).toBe(true);
+  });
+
+  test('yieldToMaturityToAnnualYield', async () => {
+    expect(yieldToMaturityToAnnualYield(
+      WAD,
+      ZERO,
+      YEAR_IN_SECONDS
+    ).eq(WAD)).toBe(true);
+    expect(yieldToMaturityToAnnualYield(
+      WAD.div(2),
+      ZERO,
+      YEAR_IN_SECONDS
+    ).eq(WAD.div(2))).toBe(true);
+    expect(yieldToMaturityToAnnualYield(
+      WAD,
+      YEAR_IN_SECONDS,
+      YEAR_IN_SECONDS
     ).eq(ZERO)).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 
-import { ZERO, WAD, YEAR_IN_SECONDS } from './utils';
+import { ZERO, WAD, YEAR_IN_SECONDS, decToWad, wadToDec } from './utils';
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 // *                                            Levered Deposit                                                *
@@ -173,7 +173,6 @@ export function profitAtMaturity(underlierUpfront, underlierToWithdraw) {
  * @param underlierUpfront Underlier amount upfront [wad]
  * @param fairPrice Fair price of collateral [wad]
  * @return yield to maturity [wad]
- * 
  */
 export function yieldToMaturity(underlierUpfront, fairPrice) {
   return (((underlierUpfront.add(fairPrice)).mul(WAD).div(underlierUpfront)).sub(WAD));
@@ -190,5 +189,5 @@ export function yieldToMaturityToAnnualYield(yieldToMaturity, now, maturity) {
   if (now.gte(maturity)) return ZERO;
   return decToWad(
     Math.pow(Number(wadToDec((WAD.add(yieldToMaturity)))), YEAR_IN_SECONDS.toNumber()/Number(maturity.sub(now)))
-  ).sub(ONE);
+  ).sub(WAD);
 }
