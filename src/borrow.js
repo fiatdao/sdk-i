@@ -1,5 +1,36 @@
-import { WAD } from './utils';
 import { ethers } from 'ethers';
+
+import { WAD, YEAR_IN_SECONDS, wadToDec, decToWad } from './utils';
+
+/**
+ * Converts interest per year to interest per second
+ * @param interestPerYear Interest per year [wad]
+ * @return interest per second [wad]
+ */ 
+export function interestPerYearToInterestPerSecond(interestPerYear) {
+  return ethers.BigNumber.from(decToWad(Math.pow(wadToDec(interestPerYear), 1/YEAR_IN_SECONDS.toNumber())));
+}
+
+/**
+ * Converts interest per seconds to interest per year
+ * @param interestPerSecond Interest per seconds [wad]
+ * @return interest per year [wad]
+ */ 
+export function interestPerSecondsToInterestPerYear(interestPerSecond) {
+  return ethers.BigNumber.from(decToWad(Math.pow(wadToDec(interestPerSecond), YEAR_IN_SECONDS.toNumber())));
+}
+
+/**
+ * Compute the interest to maturity using the interest per second
+ * @param interestPerSecond Interest per second [wad]
+ * @param now Current unix timestamp [seconds]
+ * @param maturity Maturity unix timestamp [seconds]
+ * @return interest to maturity [wad]
+ */
+export function interestPerSecondToInterestToMaturity(interestPerSecond, now, maturity) {
+  if (now.gte(maturity)) return WAD;
+  return ethers.BigNumber.from(decToWad(Math.pow(wadToDec(interestPerSecond), maturity.sub(now).toNumber())));
+}
 
 /**
  * Deducts slippage from an exchange rate
@@ -12,9 +43,9 @@ export function applySwapSlippage(exchangeRate, slippagePercentage) {
 }
 
 /**
- * Converts normalized debt to debt by applying the borrow rate
+ * Converts normalized debt to debt by applying the borrow rate accumulator
  * @param normalDebt Normalized debt [wad]
- * @param rate Borrow rat [wad]
+ * @param rate Borrow rate accumulator [wad]
  * @return debt [wad]
  */
 export function normalDebtToDebt(normalDebt, rate) {
@@ -22,9 +53,9 @@ export function normalDebtToDebt(normalDebt, rate) {
 }
 
 /**
- * Converts debt to normalized debt by deducting the borrow rate
+ * Converts debt to normalized debt by deducting the borrow rate accumulator
  * @param debt Debt [wad]
- * @param rate Borrow rate [wad]
+ * @param rate Borrow rate accumulator [wad]
  * @return normalized debt [wad]
  */
 export function debtToNormalDebt(debt, rate) {
@@ -38,11 +69,24 @@ export function debtToNormalDebt(debt, rate) {
 }
 
 /**
+ * Computes the debt at maturity via the provided normalized debt, the borrow rate accumulator and interest to maturity
+ * @param normalDebt Normalized debt [wad]
+ * @param rate Borrow rate accumulator [wad]
+ * @param interestToMaturity Interest at maturity [wad]
+ * @return debt at maturity [wad]
+ */
+export function normalDebtToDebtAtMaturity(normalDebt, rate, interestToMaturity) {
+  return normalDebt.mul(rate.add(interestToMaturity).sub(WAD)).div(WAD);
+}
+
+
+
+/**
  * Computes the collateralization ratio given collateral and normalized debt amounts
  * @param collateral Collateral [wad]
  * @param fairPrice Fair price of collateral [wad]
  * @param normalDebt Normalized debt [wad]
- * @param rate Borrow rate [wad]
+ * @param rate Borrow rate accumulator [wad]
  * @return collateralization ratio [wad]
  */
 export function computeCollateralizationRatio(collateral, fairPrice, normalDebt, rate) {
@@ -55,7 +99,7 @@ export function computeCollateralizationRatio(collateral, fairPrice, normalDebt,
 /**
  * Computes a max. possible amount of normalized debt for a given collateralization ratio
  * @param collateral Collateral [wad]
- * @param rate Borrow Rate [wad]
+ * @param rate Borrow rate accumulator [wad]
  * @param fairPrice Fair price of collateral [wad]
  * @param collateralizationRatio Collateralization ratio [wad] 
  * @return max. normalized debt [wad]
@@ -69,7 +113,7 @@ export function computeMaxNormalDebt(collateral, rate, fairPrice, collateralizat
 /**
  * Computes a min. required amount of collateral for a given collateralization ratio
  * @param normalDebt Normalized debt [wad]
- * @param rate Borrow Rate [wad]
+ * @param rate Borrow rate accumulator [wad]
  * @param fairPrice Fair price of collateral [wad]
  * @param collateralizationRatio Collateralization ratio [wad] 
  * @return min. collateral [wad]

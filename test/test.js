@@ -3,14 +3,16 @@ const ganache = require('ganache');
 
 const { FIAT } = require('../lib/index');
 const {
-  ZERO, WAD, decToWad, wadToDec, decToScale, scaleToDec, scaleToWad, wadToScale
+  ZERO, WAD, YEAR_IN_SECONDS, decToWad, wadToDec, decToScale, scaleToDec, scaleToWad, wadToScale
 } = require('../lib/utils');
 const {
-  applySwapSlippage, normalDebtToDebt, debtToNormalDebt,
+  interestPerYearToInterestPerSecond, interestPerSecondsToInterestPerYear, interestPerSecondToInterestToMaturity,
+  normalDebtToDebtAtMaturity, applySwapSlippage, normalDebtToDebt, debtToNormalDebt,
   computeCollateralizationRatio, computeMaxNormalDebt, computeMinCollateral
 } = require('../lib/borrow');
 const {
-  computeLeveredDeposit, computeLeveredWithdrawal, estimatedUnderlierForLeveredWithdrawal
+  computeFlashloanForLeveredDeposit, computeFlashloanForLeveredWithdrawal, estimatedUnderlierForLeveredWithdrawal,
+  profitAtMaturity, yieldToMaturity, yieldToMaturityToAnnualYield
 } = require('../lib/lever');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
@@ -149,13 +151,70 @@ describe('Borrow', () => {
   test('applySwapSlippage', async () => {
     expect(applySwapSlippage(WAD, decToWad(0.001)).eq(decToWad(0.999))).toBe(true);
   });
+
+  test('interestPerYearToInterestPerSecond', async () => {
+    expect(
+      interestPerYearToInterestPerSecond(decToWad('1.002500000104089600')).eq(decToWad('1.000000000078959300'))
+    ).toBe(true);
+    expect(
+      interestPerYearToInterestPerSecond(decToWad(0)).eq(ZERO)
+    ).toBe(true);
+  });
+
+  test('interestPerSecondsToInterestPerYear', async () => {
+    expect(
+      interestPerSecondsToInterestPerYear(decToWad('1.000000000079175600')).eq(decToWad('1.002506857997418600'))
+    ).toBe(true);
+    expect(
+      interestPerSecondsToInterestPerYear(decToWad(0)).eq(ZERO)
+    ).toBe(true);
+  });
+
+  test('interestPerSecondToInterestToMaturity', async () => {
+    expect(
+      interestPerSecondToInterestToMaturity(
+        interestPerYearToInterestPerSecond(WAD), ZERO, ZERO
+      ).eq(WAD)
+    ).toBe(true);
+    expect(
+      interestPerSecondToInterestToMaturity(
+        interestPerYearToInterestPerSecond(WAD), ZERO, YEAR_IN_SECONDS
+      ).eq(WAD)
+    ).toBe(true);
+    expect(
+      interestPerSecondToInterestToMaturity(
+        interestPerYearToInterestPerSecond(decToWad(1.01)), ZERO, YEAR_IN_SECONDS
+      ).gte(decToWad(1.00999999))
+    ).toBe(true);
+  });
+
+  test('normalDebtToDebtAtMaturity', async () => {
+    expect(
+      normalDebtToDebtAtMaturity(
+        decToWad(2),
+        WAD,
+        interestPerSecondToInterestToMaturity(
+          interestPerYearToInterestPerSecond(WAD), ZERO, ZERO
+        )
+      ).eq(decToWad(2))
+    ).toBe(true);
+    expect(
+      normalDebtToDebtAtMaturity(
+        decToWad(2),
+        decToWad(1.01),
+        interestPerSecondToInterestToMaturity(
+          interestPerYearToInterestPerSecond(decToWad(1.01)), ZERO, YEAR_IN_SECONDS
+        )
+      ).gte(decToWad(2))
+    ).toBe(true);
+  });
 });
 
-describe('Lever', () => {
+describe.only('Lever', () => {
 
-  test('computeLeveredDeposit', async () => {
+  test('computeFlashloanForLeveredDeposit', async () => {
     // no existing position
-    expect(computeLeveredDeposit(
+    expect(computeFlashloanForLeveredDeposit(
       ZERO,
       ZERO,
       WAD,
@@ -169,7 +228,7 @@ describe('Lever', () => {
     // Position: Collateral: 0, Debt: 0, CR: 0
     // Inputs: UnderlierUpFront: 1000, targetCR: 3.0, underlierToCollateralRate: 2.0
     // Outputs: Flashloan: 2000, Collateral: 6000 , Debt: 2000
-    expect(computeLeveredDeposit(
+    expect(computeFlashloanForLeveredDeposit(
       ZERO,
       ZERO,
       WAD,
@@ -183,7 +242,7 @@ describe('Lever', () => {
     // Position: Collateral: 0, Debt: 0, CR: 0
     // Inputs: UnderlierUpFront: 1000, targetCR: 2.0, underlierToCollateralRate: 0.5
     // Outputs: Flashloan: 333.33, Collateral: 666.66, Debt: 333.33
-    expect(computeLeveredDeposit(
+    expect(computeFlashloanForLeveredDeposit(
       ZERO,
       ZERO,
       WAD,
@@ -197,7 +256,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 500, CR: 2.0
     // Inputs: UnderlierUpFront: 200, targetCR: 2.0
     // Outputs: Flashloan: 200, Collateral: 1400, Debt: 700
-    expect(computeLeveredDeposit(
+    expect(computeFlashloanForLeveredDeposit(
       decToWad(1000),
       decToWad(500),
       WAD,
@@ -211,7 +270,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 500, CR: 2.0
     // Inputs: UnderlierUpFront: 0, targetCR: 1.5
     // Outputs: -> Flashloan: 500, Collateral: 1500, Debt: 1000
-    expect(computeLeveredDeposit(
+    expect(computeFlashloanForLeveredDeposit(
       decToWad(1000),
       decToWad(500),
       WAD,
@@ -225,7 +284,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 500, CR: 2.0
     // Inputs: UnderlierUpFront: 10000, targetCR: 2.0
     // Outputs: -> Flashloan: 10000, Collateral: 21000, Debt: 10500
-    expect(computeLeveredDeposit(
+    expect(computeFlashloanForLeveredDeposit(
       decToWad(1000),
       decToWad(500),
       WAD,
@@ -237,9 +296,9 @@ describe('Lever', () => {
     ).eq(decToWad(10000))).toBe(true);
   });
 
-  test('computeLeveredWithdrawal', async () => {
+  test('computeFlashloanForLeveredWithdrawal', async () => {
     // no existing position
-    expect(() => computeLeveredWithdrawal(
+    expect(() => computeFlashloanForLeveredWithdrawal(
       ZERO,
       ZERO,
       WAD,
@@ -251,7 +310,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 0, CR: type(uint256).max
     // Inputs: CollateralToWithdraw: 10000, targetCR: type(uint256).max
     // Outputs: -> Flashloan: 0, Collateral: 0, Debt: 0
-    expect(computeLeveredWithdrawal(
+    expect(computeFlashloanForLeveredWithdrawal(
       decToWad(1000),
       ZERO,
       WAD,
@@ -263,7 +322,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 500, CR: 2.0
     // Inputs: CollateralToWithdraw: 10000, targetCR: type(uint256).max
     // Outputs: -> Flashloan: 500, Collateral: 0, Debt: 0
-    expect(computeLeveredWithdrawal(
+    expect(computeFlashloanForLeveredWithdrawal(
       decToWad(1000),
       decToWad(500),
       WAD,
@@ -275,7 +334,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 1000, CR: 1.0
     // Inputs: CollateralToWithdraw: 1000, targetCR: type(uint256).max
     // Outputs: -> Flashloan: 1000, Collateral: 0, Debt: 0
-    expect(computeLeveredWithdrawal(
+    expect(computeFlashloanForLeveredWithdrawal(
       decToWad(1000),
       decToWad(1000),
       WAD,
@@ -287,7 +346,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 1000, CR: 2.0
     // Inputs: CollateralToWithdraw: 1000, targetCR: type(uint256).max
     // Outputs: -> Flashloan: 1000, Collateral: 0, Debt: 0
-    expect(computeLeveredWithdrawal(
+    expect(computeFlashloanForLeveredWithdrawal(
       decToWad(1000),
       decToWad(1000),
       WAD,
@@ -299,7 +358,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 1000, CR: 1.0
     // Inputs: CollateralToWithdraw: 500, targetCR: 2.0
     // Outputs: -> Flashloan: 750, Collateral: 0, Debt: 0
-    expect(computeLeveredWithdrawal(
+    expect(computeFlashloanForLeveredWithdrawal(
       decToWad(1000),
       decToWad(1000),
       WAD,
@@ -311,7 +370,7 @@ describe('Lever', () => {
     // Position: Collateral: 1000, Debt: 1000, CR: 2.0
     // Inputs: CollateralToWithdraw: 500, targetCR: 2.0
     // Outputs: -> Flashloan: 500, Collateral: 0, Debt: 0
-    expect(computeLeveredWithdrawal(
+    expect(computeFlashloanForLeveredWithdrawal(
       decToWad(1000),
       decToWad(1000),
       WAD,
@@ -348,6 +407,50 @@ describe('Lever', () => {
       WAD,
       WAD,
       decToWad(1000)
+    ).eq(ZERO)).toBe(true);
+  });
+
+  test('profitAtMaturity', async () => {
+    expect(profitAtMaturity(
+      WAD,
+      WAD
+    ).eq(ZERO)).toBe(true);
+    expect(profitAtMaturity(
+      WAD,
+      ZERO
+    ).eq(WAD.mul(-1))).toBe(true);
+    expect(profitAtMaturity(
+      ZERO,
+      WAD
+    ).eq(WAD)).toBe(true);
+  });
+
+  test('yieldToMaturity', async () => {
+    expect(yieldToMaturity(
+      WAD,
+      WAD,
+    ).eq(WAD)).toBe(true);
+    expect(yieldToMaturity(
+      WAD,
+      WAD.mul(2),
+    ).eq(WAD.mul(2))).toBe(true);
+  });
+
+  test('yieldToMaturityToAnnualYield', async () => {
+    expect(yieldToMaturityToAnnualYield(
+      WAD,
+      ZERO,
+      YEAR_IN_SECONDS
+    ).eq(WAD)).toBe(true);
+    expect(yieldToMaturityToAnnualYield(
+      WAD.div(2),
+      ZERO,
+      YEAR_IN_SECONDS
+    ).eq(WAD.div(2))).toBe(true);
+    expect(yieldToMaturityToAnnualYield(
+      WAD,
+      YEAR_IN_SECONDS,
+      YEAR_IN_SECONDS
     ).eq(ZERO)).toBe(true);
   });
 });

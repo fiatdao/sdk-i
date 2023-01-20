@@ -2,8 +2,8 @@ import { ethers } from 'ethers';
 
 export const ZERO = ethers.constants.Zero;
 export const WAD = ethers.utils.parseUnits('1', '18');
-
 export const ADDRESS_ZERO = ethers.constants.AddressZero;
+export const YEAR_IN_SECONDS = ethers.BigNumber.from(31622400);
 
 // decimal: BigNumberish -> BigNumber
 export function decToWad(decimal) {
