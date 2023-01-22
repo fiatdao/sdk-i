@@ -97,13 +97,25 @@ export function computeFlashloanForLeveredDeposit(
 /**
  * Computes the max. possible collateralization ratio for a levered withdrawal
  * @param collateral Current collateral in position [WAD]
+ * @param normalDebt Current normalDebt in position [WAD]
+ * @param fairPrice Fair price of collateral [WAD]
+ * @param rate Current (virtual) normalDebt to debt rate [WAD]
+ * @param normalDebtToRepay Max. amount of normalDebt to repay [WAD]
  * @param collateralToWithdraw Collateral to withdraw (`collateral` has to be greater or equal) [WAD]
  * @return max. collateralization ratio [WAD]
  **/ 
-export function maxCRForLeveredWithdrawal(collateral, collateralToWithdraw) {
+export function maxCRForLeveredWithdrawal(
+  collateral, normalDebt, fairPrice, rate, collateralToWithdraw, normalDebtToRepay
+) {
   if (collateral.lt(collateralToWithdraw))
     throw new Error('Invalid value for `collateralToWithdraw` - expected collateral >= collateralToWithdraw');
-  return ethers.constants.MaxUint256;
+  if (normalDebt.lt(normalDebtToRepay))
+    throw new Error('Invalid value for `normalDebt` - expected normalDebt >= normalDebtToRepay');
+  return normalDebt.isZero()
+    ? ethers.constants.MaxUint256
+    : computeCollateralizationRatio(
+      collateral.sub(collateralToWithdraw), fairPrice, position.normalDebt.sub(normalDebtToRepay), rate
+    );
 }
 
 /**
@@ -169,17 +181,18 @@ export function profitAtMaturity(underlierUpfront, underlierToWithdraw) {
 }
 
 /**
- * Computes the yield to maturity
+ * Converts the profit at maturity to the yield to maturity
+ * @dev Use `profitAtMaturity` method to compute the profit at maturity
  * @param underlierUpfront Underlier amount upfront [wad]
- * @param fairPrice Fair price of collateral [wad]
+ * @param profitAtMaturity Profit at maturity [wad]
  * @return yield to maturity [wad]
  */
-export function yieldToMaturity(underlierUpfront, fairPrice) {
-  return (((underlierUpfront.add(fairPrice)).mul(WAD).div(underlierUpfront)).sub(WAD));
+export function yieldToMaturity(underlierUpfront, profitAtMaturity) {
+  return (((underlierUpfront.add(profitAtMaturity)).mul(WAD).div(underlierUpfront)).sub(WAD));
 }
 
 /**
- * Computes the annual yield
+ * Converts the yield to maturity to annual yield (APY)
  * @param yieldToMaturity Yield to maturity [wad]
  * @param now Current timestamp [seconds]
  * @param maturity Maturity timestamp [seconds]

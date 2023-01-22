@@ -7,8 +7,9 @@ const {
 } = require('../lib/utils');
 const {
   interestPerYearToInterestPerSecond, interestPerSecondsToInterestPerYear, interestPerSecondToInterestToMaturity,
-  normalDebtToDebtAtMaturity, applySwapSlippage, normalDebtToDebt, debtToNormalDebt,
-  computeCollateralizationRatio, computeMaxNormalDebt, computeMinCollateral
+  interestPerSecondToAnnualYield, interestPerSecondToFeeRateAtMaturity,
+  normalDebtToDebtAtMaturity, normalDebtToDebt, debtToNormalDebt,
+  computeCollateralizationRatio, computeMaxNormalDebt, computeMinCollateral, applySwapSlippage
 } = require('../lib/borrow');
 const {
   computeFlashloanForLeveredDeposit, computeFlashloanForLeveredWithdrawal, estimatedUnderlierForLeveredWithdrawal,
@@ -170,6 +171,15 @@ describe('Borrow', () => {
     ).toBe(true);
   });
 
+  test('interestPerSecondToAnnualYield', async () => {
+    expect(
+      interestPerSecondToAnnualYield(decToWad('1.000000000079175600')).eq(decToWad('0.002506843900000000'))
+    ).toBe(true);
+    expect(
+      interestPerSecondToAnnualYield(decToWad(0)).eq(ZERO)
+    ).toBe(true);
+  });
+
   test('interestPerSecondToInterestToMaturity', async () => {
     expect(
       interestPerSecondToInterestToMaturity(
@@ -185,6 +195,24 @@ describe('Borrow', () => {
       interestPerSecondToInterestToMaturity(
         interestPerYearToInterestPerSecond(decToWad(1.01)), ZERO, YEAR_IN_SECONDS
       ).gte(decToWad(1.00999999))
+    ).toBe(true);
+  });
+
+  test('interestPerSecondToFeeRateAtMaturity', async () => {
+    expect(
+      interestPerSecondToFeeRateAtMaturity(
+        interestPerYearToInterestPerSecond(WAD), ZERO, ZERO
+      ).eq(ZERO)
+    ).toBe(true);
+    expect(
+      interestPerSecondToFeeRateAtMaturity(
+        interestPerYearToInterestPerSecond(WAD), ZERO, YEAR_IN_SECONDS
+      ).eq(ZERO)
+    ).toBe(true);
+    expect(
+      interestPerSecondToFeeRateAtMaturity(
+        interestPerYearToInterestPerSecond(decToWad(1.01)), ZERO, YEAR_IN_SECONDS
+      ).gte(decToWad(0.00999999))
     ).toBe(true);
   });
 
@@ -210,7 +238,7 @@ describe('Borrow', () => {
   });
 });
 
-describe.only('Lever', () => {
+describe('Lever', () => {
 
   test('computeFlashloanForLeveredDeposit', async () => {
     // no existing position

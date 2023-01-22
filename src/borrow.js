@@ -1,6 +1,16 @@
 import { ethers } from 'ethers';
 
-import { WAD, YEAR_IN_SECONDS, wadToDec, decToWad } from './utils';
+import { ZERO, WAD, YEAR_IN_SECONDS, wadToDec, decToWad } from './utils';
+
+/**
+ * Deducts slippage from an exchange rate
+ * @param exchangeRate Exchange rate [wad]
+ * @param slippagePercentage Slippage as percentage [wad]
+ * @return net exchange rate [wad]
+ */
+export function applySwapSlippage(exchangeRate, slippagePercentage) {
+  return exchangeRate.mul(WAD.sub(slippagePercentage)).div(WAD);
+}
 
 /**
  * Converts interest per year to interest per second
@@ -8,7 +18,7 @@ import { WAD, YEAR_IN_SECONDS, wadToDec, decToWad } from './utils';
  * @return interest per second [wad]
  */ 
 export function interestPerYearToInterestPerSecond(interestPerYear) {
-  return ethers.BigNumber.from(decToWad(Math.pow(wadToDec(interestPerYear), 1/YEAR_IN_SECONDS.toNumber())));
+  return decToWad(Math.pow(wadToDec(interestPerYear), 1/YEAR_IN_SECONDS.toNumber()));
 }
 
 /**
@@ -17,8 +27,20 @@ export function interestPerYearToInterestPerSecond(interestPerYear) {
  * @return interest per year [wad]
  */ 
 export function interestPerSecondsToInterestPerYear(interestPerSecond) {
-  return ethers.BigNumber.from(decToWad(Math.pow(wadToDec(interestPerSecond), YEAR_IN_SECONDS.toNumber())));
+  return decToWad(Math.pow(wadToDec(interestPerSecond), YEAR_IN_SECONDS.toNumber()));
 }
+
+/**
+ * Converts interest per second to annual yield (APY)
+ * @param interestPerSecond Interest per second [wad]
+ * @return annual yield [wad]
+ */
+export function interestPerSecondToAnnualYield(interestPerSecond) {
+  if (interestPerSecond.lt(WAD)) return ZERO;
+  return decToWad(
+    (Math.pow(Number(wadToDec(interestPerSecond).slice(0, 17)), YEAR_IN_SECONDS) - 1).toFixed(10)
+  );
+};
 
 /**
  * Compute the interest to maturity using the interest per second
@@ -29,17 +51,19 @@ export function interestPerSecondsToInterestPerYear(interestPerSecond) {
  */
 export function interestPerSecondToInterestToMaturity(interestPerSecond, now, maturity) {
   if (now.gte(maturity)) return WAD;
-  return ethers.BigNumber.from(decToWad(Math.pow(wadToDec(interestPerSecond), maturity.sub(now).toNumber())));
+  return decToWad(Math.pow(wadToDec(interestPerSecond), maturity.sub(now).toNumber()));
 }
 
 /**
- * Deducts slippage from an exchange rate
- * @param exchangeRate Exchange rate [wad]
- * @param slippagePercentage Slippage as percentage [wad]
- * @return net exchange rate [wad]
+ * Compute the fee rate due at maturity using the interest per second
+ * @param interestPerSecond Interest per second [wad]
+ * @param now Current unix timestamp [seconds]
+ * @param maturity Maturity unix timestamp [seconds]
+ * @return fee rate at maturity [wad]
  */
-export function applySwapSlippage(exchangeRate, slippagePercentage) {
-  return exchangeRate.mul(WAD.sub(slippagePercentage)).div(WAD);
+export function interestPerSecondToFeeRateAtMaturity(interestPerSecond, now, maturity) {
+  if (now.gte(maturity)) return ZERO;
+  return interestPerSecondToInterestToMaturity(interestPerSecond, now, maturity).sub(WAD);
 }
 
 /**
@@ -78,8 +102,6 @@ export function debtToNormalDebt(debt, rate) {
 export function normalDebtToDebtAtMaturity(normalDebt, rate, interestToMaturity) {
   return normalDebt.mul(rate.add(interestToMaturity).sub(WAD)).div(WAD);
 }
-
-
 
 /**
  * Computes the collateralization ratio given collateral and normalized debt amounts
