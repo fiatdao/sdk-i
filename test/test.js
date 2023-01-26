@@ -13,7 +13,8 @@ const {
 } = require('../lib/borrow');
 const {
   computeFlashloanForLeveredDeposit, computeFlashloanForLeveredWithdrawal, estimatedUnderlierForLeveredWithdrawal,
-  profitAtMaturity, yieldToMaturity, yieldToMaturityToAnnualYield
+  profitAtMaturity, yieldToMaturity, yieldToMaturityToAnnualYield,
+  minCRForLeveredDeposit, maxCRForLeveredDeposit, minCRForLeveredWithdrawal, maxCRForLeveredWithdrawal
 } = require('../lib/lever');
 const {
   queryVault, queryVaults, queryCollateralType, queryCollateralTypes,
@@ -117,6 +118,10 @@ describe('Borrow', () => {
     await server.close();
   });
 
+  test('applySwapSlippage', async () => {
+    expect(applySwapSlippage(WAD, decToWad(0.001)).eq(decToWad(0.999))).toBe(true);
+  });
+
   test('computeCollateralizationRatio', async () => {
     collateralizationRatio = computeCollateralizationRatio(
       positionData.collateral, collateralTypeData.state.collybus.fairPrice, positionData.normalDebt, collateralTypeData.state.codex.rate
@@ -147,10 +152,6 @@ describe('Borrow', () => {
     const debt = normalDebtToDebt(positionData.normalDebt, collateralTypeData.state.codex.rate);
     const normalDebt = debtToNormalDebt(debt, collateralTypeData.state.codex.rate);
     expect(normalDebt.eq(positionData.normalDebt)).toBe(true);
-  });
-
-  test('applySwapSlippage', async () => {
-    expect(applySwapSlippage(WAD, decToWad(0.001)).eq(decToWad(0.999))).toBe(true);
   });
 
   test('interestPerYearToInterestPerSecond', async () => {
@@ -239,6 +240,191 @@ describe('Borrow', () => {
 });
 
 describe('Lever', () => {
+
+  test('minCRForLeveredDeposit', async () => {
+    expect(minCRForLeveredDeposit(
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+    ).eq(ZERO)).toBe(true);
+
+    expect(
+      minCRForLeveredDeposit(
+        decToWad('0.95'),
+        decToWad('1.00'),
+        decToWad('1.00'),
+        decToWad('1.05'),
+      ).eq(decToWad('1.05'))
+    ).toBe(true)
+
+    expect(
+      minCRForLeveredDeposit(
+        decToWad('2.00'),
+        decToWad('1.00'),
+        decToWad('1.00'),
+        decToWad('1.05'),
+      ).eq(decToWad('2.00'))
+    ).toBe(true);
+
+    expect(
+      minCRForLeveredDeposit(
+        decToWad('1.00'),
+        decToWad('2.00'),
+        decToWad('1.00'),
+        decToWad('1.05'),
+      ).eq(decToWad('2.00'))
+    ).toBe(true);
+
+    expect(
+      minCRForLeveredDeposit(
+        decToWad('1.00'),
+        decToWad('1.00'),
+        decToWad('2.00'),
+        decToWad('1.05'),
+      ).eq(decToWad('2.00'))
+    ).toBe(true);
+  });
+
+  test('maxCRForLeveredDeposit', async () => {
+    expect(maxCRForLeveredDeposit(
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+    ).eq(ethers.constants.MaxUint256)).toBe(true);
+
+    expect(
+      maxCRForLeveredDeposit(
+        ZERO,
+        ZERO,
+        WAD,
+        WAD,
+        WAD,
+        decToWad('1000'),
+        decToWad('1.05'),
+      ).eq(ethers.constants.MaxUint256)
+    ).toBe(true);
+
+    expect(
+      maxCRForLeveredDeposit(
+        decToWad('2000'),
+        decToWad('1000'),
+        WAD,
+        WAD,
+        WAD,
+        decToWad('1000'),
+        decToWad('1.05'),
+      ).eq(decToWad('3.00'))
+    ).toBe(true);
+
+    expect(
+      maxCRForLeveredDeposit(
+        decToWad('2000'),
+        decToWad('1000'),
+        WAD,
+        WAD,
+        WAD,
+        decToWad(0),
+        decToWad('1.05'),
+      ).eq(decToWad('2.00'))
+    ).toBe(true);
+
+    expect(
+      maxCRForLeveredDeposit(
+        decToWad('2000'),
+        decToWad('2000'),
+        WAD,
+        WAD,
+        WAD,
+        decToWad(0),
+        decToWad('1.05'),
+      ).eq(decToWad('1.05'))
+    ).toBe(true);
+  });
+
+  test('minCRForLeveredWithdrawal', async () => {
+    expect(minCRForLeveredWithdrawal(
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+    ).eq(ethers.constants.MaxUint256)).toBe(true);
+
+    expect(minCRForLeveredWithdrawal(
+      decToWad('2000'),
+      decToWad('1000'),
+      WAD,
+      WAD,
+      decToWad('500'),
+      decToWad('1.05'),
+    ).eq(decToWad('1.50'))).toBe(true);
+
+    expect(minCRForLeveredWithdrawal(
+      decToWad('2000'),
+      decToWad('1000'),
+      WAD,
+      WAD,
+      decToWad('1000'),
+      decToWad('1.05'),
+    ).eq(decToWad('1.05'))).toBe(true);
+
+    expect(minCRForLeveredWithdrawal(
+      decToWad('2000'),
+      decToWad('1000'),
+      WAD,
+      WAD,
+      decToWad('2000'),
+      decToWad('1.05'),
+    ).eq(decToWad('1.05'))).toBe(true);
+  });
+
+  test('maxCRForLeveredWithdrawal', async () => {
+    expect(maxCRForLeveredWithdrawal(
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+      ZERO,
+    ).eq(ethers.constants.MaxUint256)).toBe(true);
+
+    expect(maxCRForLeveredWithdrawal(
+      decToWad('2000'),
+      decToWad('1000'),
+      WAD,
+      WAD,
+      decToWad('0'),
+      decToWad('0'),
+      decToWad('1.05'),
+    ).eq(decToWad('2.00'))).toBe(true)
+    
+    expect(maxCRForLeveredWithdrawal(
+      decToWad('2000'),
+      decToWad('1000'),
+      WAD,
+      WAD,
+      decToWad('500'),
+      decToWad('0'),
+      decToWad('1.05'),
+    ).eq(decToWad('1.50'))).toBe(true)
+
+    expect(maxCRForLeveredWithdrawal(
+      decToWad('2000'),
+      decToWad('1000'),
+      WAD,
+      WAD,
+      decToWad('1000'),
+      decToWad('0'),
+      decToWad('1.05'),
+    ).eq(decToWad('1.05'))).toBe(true)
+  });
 
   test('computeFlashloanForLeveredDeposit', async () => {
     // no existing position

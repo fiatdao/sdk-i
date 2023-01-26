@@ -1,6 +1,6 @@
-import { ethers } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 
-import { ZERO, WAD, YEAR_IN_SECONDS, wadToDec, decToWad } from './utils';
+import { ZERO, WAD, YEAR_IN_SECONDS, wadToDec, decToWad, toBigNumber } from './utils';
 
 /**
  * Deducts slippage from an exchange rate
@@ -9,7 +9,7 @@ import { ZERO, WAD, YEAR_IN_SECONDS, wadToDec, decToWad } from './utils';
  * @return net exchange rate [wad]
  */
 export function applySwapSlippage(exchangeRate, slippagePercentage) {
-  return exchangeRate.mul(WAD.sub(slippagePercentage)).div(WAD);
+  return toBigNumber(exchangeRate).mul(WAD.sub(slippagePercentage)).div(WAD);
 }
 
 /**
@@ -36,7 +36,7 @@ export function interestPerSecondsToInterestPerYear(interestPerSecond) {
  * @return annual yield [wad]
  */
 export function interestPerSecondToAnnualYield(interestPerSecond) {
-  if (interestPerSecond.lt(WAD)) return ZERO;
+  if (toBigNumber(interestPerSecond).lt(WAD)) return ZERO;
   return decToWad(
     (Math.pow(Number(wadToDec(interestPerSecond).slice(0, 17)), YEAR_IN_SECONDS) - 1).toFixed(10)
   );
@@ -50,8 +50,8 @@ export function interestPerSecondToAnnualYield(interestPerSecond) {
  * @return interest to maturity [wad]
  */
 export function interestPerSecondToInterestToMaturity(interestPerSecond, now, maturity) {
-  if (now.gte(maturity)) return WAD;
-  return decToWad(Math.pow(wadToDec(interestPerSecond), maturity.sub(now).toNumber()));
+  if (toBigNumber(now).gte(maturity)) return WAD;
+  return decToWad(Math.pow(wadToDec(interestPerSecond), toBigNumber(maturity).sub(now).toNumber()));
 }
 
 /**
@@ -62,7 +62,7 @@ export function interestPerSecondToInterestToMaturity(interestPerSecond, now, ma
  * @return fee rate at maturity [wad]
  */
 export function interestPerSecondToFeeRateAtMaturity(interestPerSecond, now, maturity) {
-  if (now.gte(maturity)) return ZERO;
+  if (toBigNumber(now).gte(maturity)) return ZERO;
   return interestPerSecondToInterestToMaturity(interestPerSecond, now, maturity).sub(WAD);
 }
 
@@ -73,7 +73,7 @@ export function interestPerSecondToFeeRateAtMaturity(interestPerSecond, now, mat
  * @return debt [wad]
  */
 export function normalDebtToDebt(normalDebt, rate) {
-  return normalDebt.mul(rate).div(WAD);
+  return toBigNumber(normalDebt).mul(rate).div(WAD);
 }
 
 /**
@@ -83,8 +83,8 @@ export function normalDebtToDebt(normalDebt, rate) {
  * @return normalized debt [wad]
  */
 export function debtToNormalDebt(debt, rate) {
-  if (rate.isZero()) throw new Error('Invalid value for `rate` - expected non-zero value');
-  let normalDebt = debt.mul(WAD).div(rate);
+  if (toBigNumber(rate).isZero()) throw new Error('Invalid value for `rate` - expected non-zero value');
+  let normalDebt = toBigNumber(debt).mul(WAD).div(rate);
   // avoid potential rounding error when converting back to debt from normalDebt
   if (normalDebt.mul(rate).div(WAD).lt(debt)) {
     normalDebt = normalDebt.add(1);
@@ -100,7 +100,7 @@ export function debtToNormalDebt(debt, rate) {
  * @return debt at maturity [wad]
  */
 export function normalDebtToDebtAtMaturity(normalDebt, rate, interestToMaturity) {
-  return normalDebt.mul(rate.add(interestToMaturity).sub(WAD)).div(WAD);
+  return toBigNumber(normalDebt).mul(toBigNumber(rate).add(interestToMaturity).sub(WAD)).div(WAD);
 }
 
 /**
@@ -112,10 +112,9 @@ export function normalDebtToDebtAtMaturity(normalDebt, rate, interestToMaturity)
  * @return collateralization ratio [wad]
  */
 export function computeCollateralizationRatio(collateral, fairPrice, normalDebt, rate) {
-  if (collateral.isZero()) return ethers.BigNumber.from(0);
   const debt = normalDebtToDebt(normalDebt, rate);
-  if (debt.isZero()) return ethers.BigNumber.from(ethers.constants.MaxUint256);
-  return collateral.mul(fairPrice).div(debt);
+  if (debt.isZero()) return ethers.constants.MaxUint256;
+  return toBigNumber(collateral).mul(fairPrice).div(debt);
 }
 
 /**
@@ -127,9 +126,9 @@ export function computeCollateralizationRatio(collateral, fairPrice, normalDebt,
  * @return max. normalized debt [wad]
  */
 export function computeMaxNormalDebt(collateral, rate, fairPrice, collateralizationRatio) {
-  if (collateralizationRatio.isZero()) throw new Error('Invalid value for `collateralizationRatio` - expected non-zero value');
-  if (rate.isZero()) throw new Error('Invalid value for `rate` - expected non-zero value');
-  return debtToNormalDebt(collateral.mul(fairPrice).div(collateralizationRatio), rate);
+  if (toBigNumber(collateralizationRatio).isZero())
+    throw new Error('Invalid value for `collateralizationRatio` - expected non-zero value');
+  return debtToNormalDebt(toBigNumber(collateral).mul(fairPrice).div(collateralizationRatio), rate);
 }
 
 /**
@@ -141,7 +140,8 @@ export function computeMaxNormalDebt(collateral, rate, fairPrice, collateralizat
  * @return min. collateral [wad]
  */
 export function computeMinCollateral(normalDebt, rate, fairPrice, collateralizationRatio) {
-  if (fairPrice.isZero()) throw new Error('Invalid value for `fairPrice` - expected non-zero value');
+  if (toBigNumber(fairPrice).isZero())
+    throw new Error('Invalid value for `fairPrice` - expected non-zero value');
   const debt = normalDebtToDebt(normalDebt, rate);
-  return collateralizationRatio.mul(debt).div(fairPrice);
+  return toBigNumber(collateralizationRatio).mul(debt).div(fairPrice);
 }

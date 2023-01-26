@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
+import { normalDebtToDebt, computeCollateralizationRatio } from './borrow';
 
-import { ZERO, WAD, YEAR_IN_SECONDS, decToWad, wadToDec } from './utils';
+import { ZERO, WAD, YEAR_IN_SECONDS, decToWad, wadToDec, toBigNumber } from './utils';
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 // *                                            Levered Deposit                                                *
@@ -8,13 +9,15 @@ import { ZERO, WAD, YEAR_IN_SECONDS, decToWad, wadToDec } from './utils';
 
 /**
  * Computes the min. possible collateralization ratio for a levered deposit
- * @param fairPrice Fair price of collateral [wad]
+ * @param fairPrice Liquidation price of collateral [wad]
  * @param fiatToUnderlierRate Exchange rate from FIAT to Underlier token [wad]
  * @param underlierToCollateralRate Exchange rate from Underlier to Collateral token [wad]
+ * @param liquidationRatio Liquidation ratio [wad]
  * @return min. collateralization ratio [wad]
  **/ 
-export function minCRForLeveredDeposit(fairPrice, fiatToUnderlierRate, underlierToCollateralRate) {
-  return fairPrice.mul(fiatToUnderlierRate).div(WAD).mul(underlierToCollateralRate).div(WAD);  
+export function minCRForLeveredDeposit(fairPrice, fiatToUnderlierRate, underlierToCollateralRate, liquidationRatio) {
+  const ratio = toBigNumber(fairPrice).mul(fiatToUnderlierRate).div(WAD).mul(underlierToCollateralRate).div(WAD);
+  return (ratio.gte(liquidationRatio)) ? ratio : liquidationRatio;
 }
 
 /**
@@ -25,18 +28,19 @@ export function minCRForLeveredDeposit(fairPrice, fiatToUnderlierRate, underlier
  * @param fairPrice Fair price of collateral [wad]
  * @param underlierToCollateralRate Exchange rate from Underlier to Collateral token [wad]
  * @param underlierUpfront Upfront amount of Underlier [wad]
+ * @param liquidationRatio Liquidation ratio [wad]
  * @return max. collateralization ratio [wad]
  **/ 
 export function maxCRForLeveredDeposit(
-  collateral, normalDebt, rate, fairPrice, underlierToCollateralRate, underlierUpfront
+  collateral, normalDebt, rate, fairPrice, underlierToCollateralRate, underlierUpfront, liquidationRatio
 ) {
-  const debt = normalDebt.mul(rate).div(WAD);
-  return debt.isZero()
-    ? ethers.constants.MaxUint256
-    : (
-      fairPrice
-        .mul(collateral.add(underlierToCollateralRate.mul(underlierUpfront).div(WAD))).div(WAD)
-    ).mul(WAD).div(debt);
+  const debt = normalDebtToDebt(normalDebt, rate);
+  if (debt.isZero()) return ethers.constants.MaxUint256;
+  const ratio = (toBigNumber(fairPrice)
+    .mul(toBigNumber(collateral).add(toBigNumber(underlierToCollateralRate).mul(underlierUpfront).div(WAD)))
+    .div(WAD)
+  ).mul(WAD).div(debt);
+  return (ratio.gte(liquidationRatio)) ? ratio : liquidationRatio;
 }
 
 /**
@@ -62,13 +66,16 @@ export function computeFlashloanForLeveredDeposit(
   underlierUpfront,
   targetCollateralizationRatio
 ) {
-  const debt = normalDebt.mul(rate).div(WAD);
+  const debt = normalDebtToDebt(normalDebt, rate);
   return (
-    (fairPrice.mul(collateral.add(underlierToCollateralRate.mul(underlierUpfront).div(WAD))).div(WAD))
-    .sub(targetCollateralizationRatio.mul(debt).div(WAD))
+    (
+      toBigNumber(fairPrice)
+        .mul(toBigNumber(collateral).add(toBigNumber(underlierToCollateralRate).mul(underlierUpfront).div(WAD)))
+        .div(WAD)
+    ).sub(toBigNumber(targetCollateralizationRatio).mul(debt).div(WAD))
   ).mul(WAD).div(
-    targetCollateralizationRatio
-    .sub(fairPrice.mul(fiatToUnderlierRate).div(WAD).mul(underlierToCollateralRate).div(WAD))
+    toBigNumber(targetCollateralizationRatio)
+      .sub(toBigNumber(fairPrice).mul(fiatToUnderlierRate).div(WAD).mul(underlierToCollateralRate).div(WAD))
   );
 }
 
@@ -83,15 +90,18 @@ export function computeFlashloanForLeveredDeposit(
  * @param fairPrice Fair price of collateral [wad]
  * @param rate Current (virtual) normalDebt to debt rate [wad]
  * @param collateralToWithdraw Collateral to withdraw (`collateral` has to be greater or equal) [wad]
+ * @param liquidationRatio Liquidation ratio [wad]
  * @return min. collateralization ratio [wad]
  **/ 
- export function minCRForLeveredWithdrawal(collateral, normalDebt, fairPrice, rate, collateralToWithdraw) {
-  if (collateral.lt(collateralToWithdraw))
+ export function minCRForLeveredWithdrawal(
+  collateral, normalDebt, fairPrice, rate, collateralToWithdraw, liquidationRatio
+) {
+  if (toBigNumber(collateral).lt(collateralToWithdraw))
     throw new Error('Invalid value for `collateralToWithdraw` - expected collateral >= collateralToWithdraw');
-  const debt = normalDebt.mul(rate).div(WAD);
-  return debt.isZero()
-    ? ethers.constants.MaxUint256
-    : (fairPrice.mul(collateral.sub(collateralToWithdraw)).div(debt));
+  const debt = normalDebtToDebt(normalDebt, rate);
+  if (debt.isZero()) return ethers.constants.MaxUint256;
+  const ratio = toBigNumber(fairPrice).mul(toBigNumber(collateral).sub(collateralToWithdraw)).div(debt);
+  return (ratio.gte(liquidationRatio)) ? ratio : liquidationRatio;
 }
 
 /**
@@ -102,20 +112,24 @@ export function computeFlashloanForLeveredDeposit(
  * @param rate Current (virtual) normalDebt to debt rate [WAD]
  * @param normalDebtToRepay Max. amount of normalDebt to repay [WAD]
  * @param collateralToWithdraw Collateral to withdraw (`collateral` has to be greater or equal) [WAD]
+ * @param liquidationRatio Liquidation ratio [wad]
  * @return max. collateralization ratio [WAD]
  **/ 
 export function maxCRForLeveredWithdrawal(
-  collateral, normalDebt, fairPrice, rate, collateralToWithdraw, normalDebtToRepay
+  collateral, normalDebt, fairPrice, rate, collateralToWithdraw, normalDebtToRepay, liquidationRatio
 ) {
-  if (collateral.lt(collateralToWithdraw))
+  if (toBigNumber(collateral).lt(collateralToWithdraw))
     throw new Error('Invalid value for `collateralToWithdraw` - expected collateral >= collateralToWithdraw');
-  if (normalDebt.lt(normalDebtToRepay))
+  if (toBigNumber(normalDebt).lt(normalDebtToRepay))
     throw new Error('Invalid value for `normalDebt` - expected normalDebt >= normalDebtToRepay');
-  return normalDebt.isZero()
-    ? ethers.constants.MaxUint256
-    : computeCollateralizationRatio(
-      collateral.sub(collateralToWithdraw), fairPrice, position.normalDebt.sub(normalDebtToRepay), rate
-    );
+  if (toBigNumber(normalDebt).isZero()) return ethers.constants.MaxUint256;
+  const ratio = computeCollateralizationRatio(
+    toBigNumber(collateral).sub(collateralToWithdraw),
+    fairPrice,
+    toBigNumber(normalDebt).sub(normalDebtToRepay),
+    rate
+  );
+  return (ratio.gte(liquidationRatio)) ? ratio : liquidationRatio;
 }
 
 /**
@@ -131,10 +145,13 @@ export function estimatedUnderlierForLeveredWithdrawal(
   collateralToWithdraw, collateralToUnderlierRate, underlierToFIATRate, flashloan
 ) {
   const underlier = (
-    (collateralToWithdraw.sub((flashloan.mul(WAD).div(underlierToFIATRate).mul(WAD)).div(collateralToUnderlierRate)))
-    .mul(collateralToUnderlierRate).div(WAD)
+    (
+      toBigNumber(collateralToWithdraw)
+        .sub((toBigNumber(flashloan).mul(WAD).div(underlierToFIATRate).mul(WAD)).div(collateralToUnderlierRate))
+    )
+      .mul(collateralToUnderlierRate)
+      .div(WAD)
   );
-
   if (underlier.lt(ZERO)) throw new Error('Negative withdrawable underlier amount');
   return underlier;
 }
@@ -157,13 +174,13 @@ export function computeFlashloanForLeveredWithdrawal(
   collateralToWithdraw,
   targetCollateralizationRatio
 ) {
-  if (collateralToWithdraw.gt(collateral))
+  if (toBigNumber(collateralToWithdraw).gt(collateral))
     throw new Error('Invalid value for `collateral` - expected collateral >= collateralToWithdraw');
-
-  const debt = normalDebt.mul(rate).div(WAD);
-
+  const debt = normalDebtToDebt(normalDebt, rate);
   const flashloan = debt.sub(
-    (fairPrice.mul(collateral.sub(collateralToWithdraw)).div(WAD)).mul(WAD).div(targetCollateralizationRatio)
+    (toBigNumber(fairPrice).mul(toBigNumber(collateral).sub(collateralToWithdraw)).div(WAD))
+      .mul(WAD)
+      .div(targetCollateralizationRatio)
   );
   if (flashloan.lt(ZERO)) throw new Error('Negative flashloan amount');
   return flashloan;
@@ -177,7 +194,7 @@ export function computeFlashloanForLeveredWithdrawal(
  * @return profit at maturity [wad]
  */ 
 export function profitAtMaturity(underlierUpfront, underlierToWithdraw) {
-  return underlierToWithdraw.sub(underlierUpfront);
+  return toBigNumber(underlierToWithdraw).sub(underlierUpfront);
 }
 
 /**
@@ -188,7 +205,8 @@ export function profitAtMaturity(underlierUpfront, underlierToWithdraw) {
  * @return yield to maturity [wad]
  */
 export function yieldToMaturity(underlierUpfront, profitAtMaturity) {
-  return (((underlierUpfront.add(profitAtMaturity)).mul(WAD).div(underlierUpfront)).sub(WAD));
+  if (underlierUpfront.isZero()) return ZERO;
+  return ((toBigNumber(underlierUpfront).add(profitAtMaturity)).mul(WAD).div(underlierUpfront)).sub(WAD);
 }
 
 /**
@@ -199,8 +217,11 @@ export function yieldToMaturity(underlierUpfront, profitAtMaturity) {
  * @return annual yield [wad]
  */
 export function yieldToMaturityToAnnualYield(yieldToMaturity, now, maturity) {
-  if (now.gte(maturity)) return ZERO;
+  if (toBigNumber(now).gte(maturity)) return ZERO;
   return decToWad(
-    Math.pow(Number(wadToDec((WAD.add(yieldToMaturity)))), YEAR_IN_SECONDS.toNumber()/Number(maturity.sub(now)))
+    Math.pow(
+      Number(wadToDec((WAD.add(yieldToMaturity)))),
+      YEAR_IN_SECONDS.toNumber()/Number(toBigNumber(maturity).sub(now))
+    )
   ).sub(WAD);
 }
