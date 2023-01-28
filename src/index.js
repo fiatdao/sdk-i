@@ -175,10 +175,10 @@ export class FIAT {
 
   async encode(contract, method, ...args) {
     const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
-    const gas = await _contract.estimateGas[method](...txRequest, txOpts);
-    return await _contract.populateTransaction[method](
-      ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100) }
-    );
+    const gas = (txOpts.gasLimit != undefined)
+      ? txOpts.gasLimit
+      : (await _contract.estimateGas[method](...txRequest, txOpts)).mul(this.gasMultiplier * 100).div(100);
+    return await _contract.populateTransaction[method](...txRequest, { ...txOpts, gasLimit: gas });
   }
 
   async encodeViaProxy(proxyAddress, targetContract, method, ...args) {
@@ -194,10 +194,10 @@ export class FIAT {
 
   async send(contract, method, ...args) {
     const { contract: _contract, txRequest, txOpts } = this.#buildTx(contract, ...args);
-    const gas = await _contract.estimateGas[method](...txRequest, txOpts);
-    return await _contract[method](
-      ...txRequest, { ...txOpts, gasLimit: gas.mul(this.gasMultiplier * 100).div(100) }
-    );
+    const gas = (txOpts.gasLimit != undefined)
+      ? txOpts.gasLimit
+      : (await _contract.estimateGas[method](...txRequest, txOpts)).mul(this.gasMultiplier * 100).div(100);
+    return await _contract[method]( ...txRequest, { ...txOpts, gasLimit: gas });
   }
 
   async sendAndWait(contract, method, ...args) {

@@ -773,8 +773,33 @@ describe('FIAT', () => {
       contracts.publican,
       'collect',
       ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
-      { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001'}
+      { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001' }
     );
+    
+    expect(
+      await fiat.encode(
+        contracts.publican,
+        'collect',
+        ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+        { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001' }
+      )
+    ).toMatchObject({
+      maxFeePerGas: ethers.BigNumber.from('65000000000'),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1500000001')
+    });
+
+    expect(
+      await fiat.encode(
+        contracts.publican,
+        'collect',
+        ADDRESSES_MAINNET.vaultEPT_ePyvDAI_24FEB23.address,
+        { maxFeePerGas: '65000000000', maxPriorityFeePerGas: '1500000001', gasLimit: '9595959595' }
+      )
+    ).toMatchObject({
+      maxFeePerGas: ethers.BigNumber.from('65000000000'),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1500000001'),
+      gasLimit: ethers.BigNumber.from('9595959595')
+    });
   });
 
   // Ganache returns stale data 
