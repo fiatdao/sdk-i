@@ -686,7 +686,7 @@ describe('FIAT', () => {
   
   beforeAll(async () => {
     const options = {
-      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 16370300 },
+      fork: { url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`, blockNumber: 16602393 },
       miner: { defaultGasPrice: 30000000000 },
       wallet: { unlockedAccounts: [defaultAccount, proxyOwner] },
       logging: { quiet: true }
@@ -876,7 +876,7 @@ describe('FIAT', () => {
     const resultErrorGanache = await fiat.dryrun(vault, 'enter', 0, await fiat.signer.getAddress(), '1000');
     expect(resultErrorGanache.success).toBe(false);
     expect(resultErrorGanache.reason.includes('ERC20: insufficient-balance')).toBe(true);
-    expect(resultErrorGanache.customError).toBe('Error(string)'); // note: `data` field is not returned by tenderly
+    expect(resultErrorGanache.customError).toBe('Error(string)');
 
     const fiat_ = await FIAT.fromPrivateKey(
       `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
